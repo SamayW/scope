@@ -40,8 +40,11 @@ export function parseHunks(raw: string): Hunk[] {
       headerLines.push(`new file mode ${parsed.newMode ?? '100644'}`);
     }
 
-    for (const index of parsed.index ?? []) {
-      headerLines.push(`index ${index}`);
+    // parse-diff splits "index 90e548d..a813af6 100644" into separate array
+    // entries. Emitting one line each produces a malformed second index line,
+    // so they are rejoined into the single line git actually wrote.
+    if (parsed.index && parsed.index.length > 0) {
+      headerLines.push(`index ${parsed.index.join(' ')}`);
     }
 
     headerLines.push(

@@ -8,6 +8,9 @@ DEMO="$SCOPE/../scope-demo"
 
 cd "$DEMO"
 git checkout -q -B demo demo-base
+# hard reset, not just a checkout: a previous rehearsal may have left tracked
+# files modified, and those would show up as phantom changes in the demo
+git reset -q --hard demo-base
 git clean -qfd -e node_modules
 rm -rf .scope
 
