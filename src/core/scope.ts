@@ -1,6 +1,18 @@
+import { minimatch } from 'minimatch';
 import type { Domain, Hunk, Session } from './types.js';
 
-/** No session means everything is in scope. Pure. */
+/**
+ * A hunk is in scope when it matches an allowed glob or an allowed domain.
+ * With no session there is nothing to be out of scope of. Pure.
+ */
 export function isInScope(hunk: Hunk, domain: Domain, session: Session | null): boolean {
-  throw new Error('not implemented');
+  if (!session) {
+    return true;
+  }
+
+  if (session.allow.domains.includes(domain)) {
+    return true;
+  }
+
+  return session.allow.globs.some((glob) => minimatch(hunk.file, glob));
 }
