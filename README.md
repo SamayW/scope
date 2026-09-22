@@ -26,6 +26,22 @@ scope check
 
 Then it blocks or allows. Failing checks, deleted tests, secrets and unapproved out-of-scope work each stop a push, and the policy is configurable in `.scope.yml`.
 
+## Getting started
+
+```sh
+git clone https://github.com/SamayW/scope.git
+git clone https://github.com/SamayW/scope-demo.git      # needed for the demo and four test suites
+
+cd scope            # the scripts run from inside this folder, not its parent
+npm install
+npm run compile
+npm run demo        # stages the demo scenario in scope-demo
+```
+
+Then open the `scope` folder in VS Code and press F5, or install the vsix below and open `scope-demo` directly.
+
+Everything is cross platform; the scripts are Node rather than shell.
+
 ## Install
 
 Grab `scope-0.0.1.vsix` from the repo and either:

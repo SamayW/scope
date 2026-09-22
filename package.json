@@ -115,15 +115,15 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./ && chmod +x out/cli.js",
+    "compile": "tsc -p ./ && node scripts/postcompile.js",
     "watch": "tsc -watch -p ./",
     "test": "vitest run",
-    "itest": "tsc -p ./ && node out/itest/runTest.js",
-    "demo:reset": "bash scripts/demo-reset.sh",
-    "demo:agent": "bash scripts/demo-agent.sh",
+    "itest": "npm run compile && node out/itest/runTest.js",
+    "demo:reset": "node scripts/demo.js reset",
+    "demo:agent": "node scripts/demo.js agent",
     "package": "vsce package",
-    "demo": "bash scripts/demo.sh",
-    "itest:installed": "tsc -p ./ && SCOPE_ITEST_TARGET=\"$HOME/.vscode/extensions/samay.scope-0.0.1\" node out/itest/runTest.js"
+    "demo": "node scripts/demo.js",
+    "itest:installed": "npm run compile && node out/itest/runTest.js --installed"
   },
   "dependencies": {
     "commander": "^14.0.3",

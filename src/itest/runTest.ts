@@ -8,7 +8,7 @@ import {
   symlinkSync,
   existsSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runTests } from '@vscode/test-electron';
 
@@ -72,10 +72,14 @@ function buildWorkspace(): string {
 }
 
 async function main(): Promise<void> {
-  // SCOPE_ITEST_TARGET lets the same suite run against the packaged and
-  // installed copy, which is what people actually get, rather than the source
-  // tree with node_modules sitting beside it.
-  const extensionDevelopmentPath = process.env.SCOPE_ITEST_TARGET ?? resolve(__dirname, '../../');
+  // --installed runs the same suite against the packaged copy in the user's
+  // extensions folder, which is what people actually get, rather than the
+  // source tree with node_modules sitting beside it. A flag rather than an
+  // env var, because npm scripts on Windows cannot set one inline.
+  const installed = process.argv.includes('--installed');
+  const extensionDevelopmentPath = installed
+    ? join(homedir(), '.vscode', 'extensions', 'samay.scope-0.0.1')
+    : resolve(__dirname, '../../');
   console.log(`testing extension at: ${extensionDevelopmentPath}`);
   const extensionTestsPath = resolve(__dirname, './suite/index');
   const workspace = buildWorkspace();
