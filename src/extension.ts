@@ -1,15 +1,594 @@
+import { existsSync, readdirSync } from 'node:fs';
+import { basename, join, relative, sep } from 'node:path';
+import execa from 'execa';
 import * as vscode from 'vscode';
 import { analyze } from './core/analyze.js';
-import { ScopeSidebarProvider } from './vscode/sidebar.js';
+import { selectChecks } from './core/checks.js';
+import { evaluateGate, loadPolicy } from './core/gate.js';
+import { getFallbackBaseline, isGitRepo } from './core/git.js';
+import { attachResults, runChecks } from './core/runner.js';
+import { revertHunk, revertOutOfScope } from './core/revert.js';
+import { approveHunk, startSession } from './core/session.js';
+import { detectStack } from './core/stack.js';
+import { installHook } from './hook.js';
+import { ScopePanel } from './webview/panel.js';
+import type {
+  Analysis,
+  Check,
+  CheckResult,
+  ClassifiedHunk,
+  Domain,
+  Group,
+  Stack,
+} from './core/types.js';
+
+const BASE_SCHEME = 'scope-base';
+
+/**
+ * Query marker for "this side of the diff is nothing".
+ * A deleted file has no working-tree copy and an added file has no baseline
+ * copy, so one side has to be a virtual empty document rather than a file on
+ * disk that does not exist.
+ */
+const EMPTY_SIDE = '__empty__';
+const DOMAINS: Domain[] = ['auth', 'db', 'deps', 'tests', 'config', 'api', 'ui', 'other'];
+
+let panel: ScopePanel;
+let status: vscode.StatusBarItem;
+let fileStatus: vscode.StatusBarItem;
+let output: vscode.OutputChannel;
+let latest: Analysis | null = null;
+let latestChecks: Check[] = [];
+let latestResults: CheckResult[] = [];
+
+let repoRoot: string | undefined;
+
+function root(): string | undefined {
+  return repoRoot;
+}
+
+/** Git repositories sitting one level below a folder. */
+function childRepos(dir: string): string[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+      .filter((entry) => entry.name !== 'node_modules')
+      .map((entry) => join(dir, entry.name))
+      .filter((child) => existsSync(join(child, '.git')));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The workspace folder is often a container rather than the repository itself,
+ * for example a folder holding two checkouts side by side. Fall back to looking
+ * one level down before giving up.
+ */
+async function resolveRepoRoot(): Promise<string | undefined> {
+  if (repoRoot && (await isGitRepo(repoRoot))) {
+    return repoRoot;
+  }
+
+  const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!workspace) {
+    return undefined;
+  }
+
+  if (await isGitRepo(workspace)) {
+    repoRoot = workspace;
+    return repoRoot;
+  }
+
+  const children = childRepos(workspace);
+
+  if (children.length === 1) {
+    repoRoot = children[0];
+    return repoRoot;
+  }
+
+  if (children.length > 1) {
+    const pick = await vscode.window.showQuickPick(
+      children.map((path) => ({ label: basename(path), description: path, path })),
+      { title: 'Scope: which repository should I watch?' }
+    );
+    repoRoot = pick?.path;
+    return repoRoot;
+  }
+
+  repoRoot = undefined;
+  return undefined;
+}
+
+function findHunk(hunkId: string): ClassifiedHunk | undefined {
+  return latest?.groups.flatMap((group) => group.hunks).find((hunk) => hunk.id === hunkId);
+}
+
+function setStatus(analysis: Analysis, blocked: boolean): void {
+  const high = analysis.groups.filter((group) => group.risk === 'high').length;
+
+  if (blocked) {
+    status.text = `$(shield) Scope: ${high} high, BLOCKED`;
+    status.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+  } else {
+    status.text = '$(check) Scope: OK';
+    status.backgroundColor = undefined;
+  }
+  status.show();
+}
+
+
+/** Workspace-relative, forward slashed, to match the paths git reports. */
+function relativeToRoot(uri: vscode.Uri): string | undefined {
+  const cwd = root();
+  if (!cwd) {
+    return undefined;
+  }
+  return relative(cwd, uri.fsPath).split(sep).join('/');
+}
+
+/** The group and hunks covering a file, if Scope found any. */
+function entryFor(file: string): { group: Group; hunks: ClassifiedHunk[] } | undefined {
+  for (const group of latest?.groups ?? []) {
+    const hunks = group.hunks.filter((hunk) => hunk.file === file);
+    if (hunks.length > 0) {
+      return { group, hunks };
+    }
+  }
+  return undefined;
+}
+
+/** Results for every check that covered this domain, 'any' checks included. */
+function resultsForDomain(domain: Domain): CheckResult[] {
+  const byId = new Map(latestChecks.map((check) => [check.id, check]));
+  return latestResults.filter((result) => {
+    const check = byId.get(result.checkId);
+    return check ? check.domains === 'any' || check.domains.includes(domain) : false;
+  });
+}
+
+/** Right-hand status bar summary for whichever file is in front of you. */
+function updateFileStatus(): void {
+  const editor = vscode.window.activeTextEditor;
+  const file = editor ? relativeToRoot(editor.document.uri) : undefined;
+  const entry = file ? entryFor(file) : undefined;
+
+  void vscode.commands.executeCommand('setContext', 'scope.fileTracked', Boolean(entry));
+
+  if (!entry) {
+    fileStatus.hide();
+    return;
+  }
+
+  const flags = entry.hunks.flatMap((hunk) => hunk.flags);
+  const failed = resultsForDomain(entry.group.domain).filter(
+    (result) => result.status === 'fail' || result.status === 'timeout'
+  );
+
+  const parts = [`${entry.group.domain} ${entry.group.risk}`];
+  if (entry.hunks.some((hunk) => !hunk.inScope && !hunk.approved)) {
+    parts.push('out of scope');
+  }
+  if (flags.length > 0) {
+    parts.push(`${flags.length} flag${flags.length === 1 ? '' : 's'}`);
+  }
+  if (failed.length > 0) {
+    parts.push(`${failed.length} check${failed.length === 1 ? '' : 's'} failing`);
+  }
+
+  fileStatus.text = `$(shield) ${parts.join(' \u00b7 ')}`;
+  fileStatus.tooltip = 'Scope: show what ran on this file';
+  fileStatus.command = 'scope.fileReport';
+  fileStatus.backgroundColor =
+    entry.group.risk === 'high'
+      ? new vscode.ThemeColor('statusBarItem.warningBackground')
+      : undefined;
+  fileStatus.show();
+}
+
+/** The full per-file report: what was flagged, and every check that ran. */
+function showFileReport(): void {
+  const editor = vscode.window.activeTextEditor;
+  const file = editor ? relativeToRoot(editor.document.uri) : undefined;
+
+  output.clear();
+  output.show(true);
+
+  if (!file) {
+    output.appendLine('No file is open.');
+    return;
+  }
+
+  output.appendLine(file);
+  output.appendLine('='.repeat(file.length));
+  output.appendLine('');
+
+  if (latest?.session) {
+    output.appendLine(`task    ${latest.session.task}`);
+    output.appendLine(`scope   ${latest.session.allow.globs.join(', ') || '(none)'}`);
+    output.appendLine('');
+  }
+
+  const entry = entryFor(file);
+  if (!entry) {
+    output.appendLine('Scope found no changes in this file against the baseline.');
+    return;
+  }
+
+  const outOfScope = entry.hunks.some((hunk) => !hunk.inScope && !hunk.approved);
+  output.appendLine(`domain  ${entry.group.domain}`);
+  output.appendLine(`risk    ${entry.group.risk}`);
+  output.appendLine(`scope   ${outOfScope ? 'OUT OF SCOPE' : 'in scope'}`);
+  output.appendLine('');
+
+  output.appendLine('GUARDRAILS');
+  const flags = entry.hunks.flatMap((hunk) => hunk.flags);
+  if (flags.length === 0) {
+    output.appendLine('  nothing flagged');
+  }
+  for (const flag of flags) {
+    output.appendLine(`  [${flag.id}] ${flag.message}  (+${flag.points})`);
+  }
+  output.appendLine('');
+
+  output.appendLine('CHECKS THAT COVERED THIS FILE');
+  const results = resultsForDomain(entry.group.domain);
+  if (results.length === 0) {
+    output.appendLine('  none ran');
+  }
+  for (const result of results) {
+    output.appendLine(
+      `  ${result.status.toUpperCase().padEnd(8)} ${result.label}  (${result.durationMs}ms)`
+    );
+    if (result.status !== 'pass' && result.output.trim()) {
+      for (const line of result.output.trimEnd().split('\n')) {
+        output.appendLine(`      ${line}`);
+      }
+    }
+  }
+  output.appendLine('');
+
+  output.appendLine('HUNKS');
+  for (const hunk of entry.hunks) {
+    const state = hunk.approved ? 'approved' : hunk.inScope ? 'in scope' : 'out of scope';
+    output.appendLine(
+      `  ${hunk.id}  +${hunk.added.length} -${hunk.removed.length}  ${state}`
+    );
+  }
+}
+
+/** Every command says what it did, so nothing can fail invisibly again. */
+function log(line: string): void {
+  output.appendLine(`[${new Date().toLocaleTimeString()}] ${line}`);
+}
+
+/**
+ * Guards a button action. Returns the repo root and hunk, or explains on screen
+ * why it cannot act. Silent returns here were the reason Diff, Approve and
+ * Revert appeared to do nothing at all.
+ */
+function requireHunk(command: string, hunkId: string | undefined) {
+  const cwd = root();
+
+  if (!cwd) {
+    log(`${command}: no repository resolved`);
+    vscode.window.showWarningMessage('Scope: no git repository. Run Scope: Refresh first.');
+    return undefined;
+  }
+  if (!latest) {
+    log(`${command}: no analysis yet`);
+    vscode.window.showWarningMessage('Scope: nothing analyzed yet. Run Scope: Refresh first.');
+    return undefined;
+  }
+  if (!hunkId) {
+    log(`${command}: called with no hunk id`);
+    vscode.window.showWarningMessage('Scope: that action did not carry a hunk id.');
+    return undefined;
+  }
+
+  const hunk = findHunk(hunkId);
+  if (!hunk) {
+    log(`${command}: hunk ${hunkId} is not in the current analysis`);
+    vscode.window.showWarningMessage(
+      `Scope: ${hunkId} is no longer in the analysis. Refresh and try again.`
+    );
+    return undefined;
+  }
+
+  return { cwd, hunk };
+}
+
+let running = false;
+let queued = false;
+
+/** Never two at once; at most one more waiting. */
+async function refresh(): Promise<void> {
+  if (running) {
+    queued = true;
+    return;
+  }
+
+  running = true;
+  try {
+    await runRefresh();
+  } catch (error) {
+    vscode.window.showErrorMessage(`Scope: ${(error as Error).message}`);
+  } finally {
+    running = false;
+    if (queued) {
+      queued = false;
+      void refresh();
+    }
+  }
+}
+
+async function runRefresh(): Promise<void> {
+  const cwd = await resolveRepoRoot();
+
+  if (!cwd) {
+    latest = null;
+    status.hide();
+    fileStatus.hide();
+    panel.post({
+      type: 'notice',
+      data: 'No git repository here. Scope compares your changes against a baseline commit, so it needs one. Open the repository itself, or a folder that contains one, or run git init.',
+    });
+    return;
+  }
+
+  if (cwd !== vscode.workspace.workspaceFolders?.[0]?.uri.fsPath) {
+    panel.post({ type: 'repo', data: basename(cwd) });
+  }
+
+  const analysis = await analyze(cwd);
+  latest = analysis;
+  panel.post({ type: 'analysis', data: analysis });
+
+  const policy = loadPolicy(cwd);
+
+  let stack: Stack;
+  try {
+    stack = detectStack(cwd);
+  } catch {
+    return;
+  }
+
+  const checks = selectChecks(stack, analysis, policy);
+  panel.post({ type: 'checksStarted', data: checks });
+
+  latestChecks = checks;
+  latestResults = [];
+
+  const results = await runChecks(checks, cwd, (result) => {
+    latestResults.push(result);
+    panel.post({ type: 'checkResult', data: result });
+    updateFileStatus();
+  });
+
+  latestResults = results;
+  latest = attachResults(analysis, results, checks);
+  updateFileStatus();
+
+  const gate = evaluateGate(latest, results, policy);
+  panel.post({ type: 'gate', data: gate });
+  setStatus(latest, gate.blocked);
+}
 
 export function activate(context: vscode.ExtensionContext): void {
-  const sidebar = new ScopeSidebarProvider();
+  panel = new ScopePanel(context.extensionUri, () => void refresh());
+  output = vscode.window.createOutputChannel('Scope');
+
+  status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  status.command = 'scope.focus';
+
+  fileStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+
+  // Left-hand side of the diff view: the file as it was at the baseline.
+  const baseProvider = vscode.workspace.registerTextDocumentContentProvider(BASE_SCHEME, {
+    async provideTextDocumentContent(uri) {
+      if (uri.query === EMPTY_SIDE) {
+        return '';
+      }
+
+      const cwd = root();
+      if (!cwd) {
+        return '';
+      }
+      const result = await execa('git', ['show', `${uri.query}:${uri.path.slice(1)}`], {
+        cwd,
+        reject: false,
+      });
+      // empty is correct for a file that did not exist at the baseline
+      return result.exitCode === 0 ? result.stdout : '';
+    },
+  });
+
+  let timer: NodeJS.Timeout | undefined;
+  const schedule = () => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+    timer = setTimeout(() => void refresh(), 1000);
+  };
+
+  const onSave = vscode.workspace.onDidSaveTextDocument(schedule);
+
+  // Commits, branch switches and cherry-picks all move HEAD or the index.
+  // Without this the sidebar keeps showing a stale analysis after the working
+  // tree has changed underneath it, and its buttons refer to hunks that are no
+  // longer there.
+  const gitWatcher = vscode.workspace.createFileSystemWatcher(
+    '**/.git/{HEAD,index,ORIG_HEAD}'
+  );
+  gitWatcher.onDidChange(schedule);
+  gitWatcher.onDidCreate(schedule);
+  gitWatcher.onDidDelete(schedule);
 
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ScopeSidebarProvider.viewType, sidebar),
-    vscode.commands.registerCommand('scope.refresh', async () => {
-      const analysis = await analyze(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath);
-      vscode.window.showInformationMessage(`Scope: ${analysis.groups.length} groups`);
+    status,
+    fileStatus,
+    output,
+    baseProvider,
+    gitWatcher,
+    vscode.window.onDidChangeActiveTextEditor(() => updateFileStatus()),
+    vscode.commands.registerCommand('scope.fileReport', () => showFileReport()),
+    onSave,
+    vscode.window.registerWebviewViewProvider(ScopePanel.viewType, panel),
+
+    vscode.commands.registerCommand('scope.focus', () => {
+      void vscode.commands.executeCommand('scope.sidebar.focus');
+    }),
+
+    vscode.commands.registerCommand('scope.refresh', () => refresh()),
+
+    vscode.commands.registerCommand('scope.start', async () => {
+      const cwd = root();
+      if (!cwd) {
+        return;
+      }
+
+      const task = await vscode.window.showInputBox({
+        title: 'Scope: what was the agent asked to do?',
+        placeHolder: 'add signup form validation',
+      });
+      if (!task) {
+        return;
+      }
+
+      const domains = await vscode.window.showQuickPick(DOMAINS, {
+        title: 'Allowed domains (optional)',
+        canPickMany: true,
+      });
+
+      const globs = await vscode.window.showInputBox({
+        title: 'Allowed paths, comma separated',
+        placeHolder: 'src/app/signup/*.tsx',
+      });
+
+      await startSession(cwd, task, {
+        globs: (globs ?? '')
+          .split(',')
+          .map((glob) => glob.trim())
+          .filter(Boolean),
+        domains: (domains ?? []) as Domain[],
+      });
+
+      await refresh();
+    }),
+
+    vscode.commands.registerCommand('scope.openDiff', async (hunkId: string) => {
+      const target = requireHunk('openDiff', hunkId);
+      if (!target) {
+        return;
+      }
+
+      // Without a session there is no pinned baseline, but the diff is still
+      // meaningful against the fork point. This used to return silently.
+      const baseline = latest?.session?.baseline ?? (await getFallbackBaseline(target.cwd));
+
+      const file = target.hunk.file;
+      const deleted = target.hunk.fileStatus === 'deleted';
+      const added = target.hunk.fileStatus === 'added';
+
+      // A deleted file has nothing on disk to show on the right, and an added
+      // file has nothing at the baseline to show on the left. Pointing either
+      // at a real path produces "Unable to resolve nonexistent file".
+      const left = added
+        ? vscode.Uri.parse(`${BASE_SCHEME}:/${file}?${EMPTY_SIDE}`)
+        : vscode.Uri.parse(`${BASE_SCHEME}:/${file}?${baseline}`);
+
+      const right = deleted
+        ? vscode.Uri.parse(`${BASE_SCHEME}:/${file}?${EMPTY_SIDE}`)
+        : vscode.Uri.file(join(target.cwd, file));
+
+      const suffix = deleted ? ' (deleted)' : added ? ' (added)' : '';
+
+      log(`openDiff ${file}${suffix} against ${baseline.slice(0, 8)}`);
+      await vscode.commands.executeCommand(
+        'vscode.diff',
+        left,
+        right,
+        `${file} (Scope)${suffix}`
+      );
+    }),
+
+    vscode.commands.registerCommand('scope.approve', async (hunkId: string) => {
+      const target = requireHunk('approve', hunkId);
+      if (!target) {
+        return;
+      }
+
+      try {
+        approveHunk(target.cwd, hunkId);
+        log(`approved ${hunkId}`);
+        vscode.window.setStatusBarMessage(`Scope: approved ${hunkId}`, 3000);
+      } catch (error) {
+        log(`approve failed: ${(error as Error).message}`);
+        vscode.window.showErrorMessage(`Scope: ${(error as Error).message}`);
+        return;
+      }
+
+      await refresh();
+    }),
+
+    vscode.commands.registerCommand('scope.revertHunk', async (hunkId: string) => {
+      const target = requireHunk('revertHunk', hunkId);
+      if (!target) {
+        return;
+      }
+
+      try {
+        await revertHunk(target.cwd, target.hunk);
+        log(`reverted ${hunkId}`);
+        vscode.window.setStatusBarMessage(`Scope: reverted ${hunkId}`, 3000);
+      } catch (error) {
+        log(`revert failed: ${(error as Error).message}`);
+        vscode.window.showErrorMessage(`Scope: could not revert. ${(error as Error).message}`);
+        return;
+      }
+
+      await refresh();
+    }),
+
+    vscode.commands.registerCommand('scope.revertOutOfScope', async () => {
+      const cwd = root();
+      if (!cwd || !latest) {
+        return;
+      }
+
+      const count = latest.groups
+        .flatMap((group) => group.hunks)
+        .filter((hunk) => !hunk.inScope && !hunk.approved).length;
+
+      const confirm = await vscode.window.showWarningMessage(
+        `Revert ${count} out-of-scope hunk${count === 1 ? '' : 's'}?`,
+        { modal: true },
+        'Revert'
+      );
+      if (confirm !== 'Revert') {
+        return;
+      }
+
+      const { reverted, failed } = await revertOutOfScope(cwd, latest);
+      if (failed.length > 0) {
+        vscode.window.showWarningMessage(
+          `Scope reverted ${reverted.length}, could not revert ${failed.length}.`
+        );
+      } else {
+        vscode.window.showInformationMessage(`Scope reverted ${reverted.length} hunks.`);
+      }
+
+      await refresh();
+    }),
+
+    vscode.commands.registerCommand('scope.installHook', () => {
+      const cwd = root();
+      if (!cwd) {
+        return;
+      }
+      const cliPath = join(context.extensionPath, 'out', 'cli.js');
+      installHook(cwd, cliPath);
+      vscode.window.showInformationMessage('Scope: pre-push hook installed.');
     })
   );
 }

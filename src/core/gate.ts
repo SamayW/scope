@@ -25,7 +25,8 @@ export function loadPolicy(cwd: string): Policy {
 
     return {
       blockOn: blockOn && blockOn.length > 0 ? blockOn : DEFAULT_POLICY.blockOn,
-      groups: (raw.groups as Policy['groups']) ?? undefined,
+      // the yaml key stays `groups:` as documented in the plan
+      customChecks: (raw.groups as Policy['customChecks']) ?? undefined,
     };
   } catch {
     // a malformed config must not silently disable the gate

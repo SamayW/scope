@@ -2,7 +2,8 @@
 import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { analyze } from './core/analyze.js';
-import { selectChecks, runChecks } from './core/checks.js';
+import { selectChecks } from './core/checks.js';
+import { runChecks } from './core/runner.js';
 import { loadPolicy, evaluateGate } from './core/gate.js';
 import { getRepoRoot } from './core/git.js';
 import { detectStack } from './core/stack.js';
@@ -132,10 +133,10 @@ program
         typescript: true,
         next: true,
         prisma: true,
-        vitest: true,
-        jest: false,
-        eslint: true,
+        eslint: false,
         docker: false,
+        testRunner: 'vitest',
+        packageManager: 'npm',
       };
     }
 

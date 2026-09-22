@@ -85,20 +85,19 @@ export interface Analysis {
   changedFiles: string[];
 }
 
-export type CheckId =
-  | 'tsc'
-  | 'eslint'
-  | 'prisma-validate'
-  | 'vitest-related'
-  | 'npm-audit'
-  | 'secret-scan';
+/**
+ * Open rather than a closed union: custom checks declared in .scope.yml carry
+ * ids we cannot know ahead of time.
+ */
+export type CheckId = string;
 
+/** `domains: 'any'` means the check covers the whole diff, not one domain. */
 export interface Check {
   id: CheckId;
   label: string;
   command: string;
   args: string[];
-  domains: Domain[];
+  domains: Domain[] | 'any';
   timeoutMs: number;
 }
 
@@ -118,18 +117,19 @@ export interface Stack {
   typescript: boolean;
   next: boolean;
   prisma: boolean;
-  vitest: boolean;
-  jest: boolean;
   eslint: boolean;
   docker: boolean;
+  /** Which runner to shell out to, or null when the project has neither. */
+  testRunner: 'vitest' | 'jest' | null;
+  packageManager: 'npm' | 'yarn' | 'pnpm';
 }
 
 export type BlockRule = 'failing_checks' | 'deleted_tests' | 'secrets' | 'out_of_scope';
 
 export interface Policy {
   blockOn: BlockRule[];
-  /** Optional per-domain command overrides from .scope.yml. */
-  groups?: Record<string, string[]>;
+  /** Extra per-domain commands from the `groups:` key in .scope.yml. */
+  customChecks?: Record<string, string[]>;
 }
 
 export interface GateReason {

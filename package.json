@@ -16,13 +16,49 @@
   "bin": {
     "scope": "./out/cli.js"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:scope.sidebar",
+    "workspaceContains:.git"
+  ],
   "contributes": {
     "commands": [
+      {
+        "command": "scope.start",
+        "title": "Scope: Start Task"
+      },
       {
         "command": "scope.refresh",
         "title": "Scope: Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "scope.openDiff",
+        "title": "Scope: Open Diff"
+      },
+      {
+        "command": "scope.approve",
+        "title": "Scope: Approve Hunk"
+      },
+      {
+        "command": "scope.revertHunk",
+        "title": "Scope: Revert Hunk"
+      },
+      {
+        "command": "scope.revertOutOfScope",
+        "title": "Scope: Revert All Out-of-Scope Changes"
+      },
+      {
+        "command": "scope.installHook",
+        "title": "Scope: Install Pre-Push Hook"
+      },
+      {
+        "command": "scope.focus",
+        "title": "Scope: Focus Sidebar"
+      },
+      {
+        "command": "scope.fileReport",
+        "title": "Scope: What ran on this file",
+        "icon": "$(shield)"
       }
     ],
     "viewsContainers": {
@@ -50,13 +86,44 @@
           "when": "view == scope.sidebar",
           "group": "navigation"
         }
+      ],
+      "commandPalette": [
+        {
+          "command": "scope.openDiff",
+          "when": "false"
+        },
+        {
+          "command": "scope.approve",
+          "when": "false"
+        },
+        {
+          "command": "scope.revertHunk",
+          "when": "false"
+        },
+        {
+          "command": "scope.focus",
+          "when": "false"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "scope.fileReport",
+          "when": "scope.fileTracked",
+          "group": "navigation@1"
+        }
       ]
     }
   },
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "vitest run"
+    "test": "vitest run",
+    "itest": "tsc -p ./ && node out/itest/runTest.js",
+    "demo:reset": "bash scripts/demo-reset.sh",
+    "demo:agent": "bash scripts/demo-agent.sh",
+    "package": "vsce package",
+    "demo": "bash scripts/demo.sh",
+    "itest:installed": "tsc -p ./ && SCOPE_ITEST_TARGET=\"$HOME/.vscode/extensions/samay.scope-0.0.1\" node out/itest/runTest.js"
   },
   "dependencies": {
     "commander": "^14.0.3",
@@ -67,9 +134,20 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^26.6.2",
     "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "glob": "^13.0.6",
+    "mocha": "^12.0.2",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
+  },
+  "publisher": "samay",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SamayW/scope.git"
   }
 }

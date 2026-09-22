@@ -47,6 +47,18 @@ describe('parseHunks', () => {
     expect(schema.added).toContain('  isAdmin');
   });
 
+  it('rebuilds the index line as one line, the way git wrote it', () => {
+    // parse-diff splits "index abc..def 100644" into two array entries; a naive
+    // rejoin emits a bogus second "index 100644" line and the patch is invalid
+    for (const hunk of hunks) {
+      const indexLines = hunk.patch.split('\n').filter((l) => l.startsWith('index '));
+      expect(indexLines.length).toBeLessThanOrEqual(1);
+      for (const line of indexLines) {
+        expect(line).toMatch(/^index [0-9a-f]+\.\.[0-9a-f]+( \d{6})?$/);
+      }
+    }
+  });
+
   it('returns nothing for an empty diff', () => {
     expect(parseHunks('')).toEqual([]);
     expect(parseHunks('   \n')).toEqual([]);

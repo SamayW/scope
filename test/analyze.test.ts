@@ -123,3 +123,17 @@ describe('scope boundaries change what counts as out of scope', () => {
     expect(analysis.groups.every((g) => !g.outOfScope)).toBe(true);
   });
 });
+
+describe('a folder git knows nothing about', () => {
+  it('fails with a readable message rather than git usage text', async () => {
+    const plain = mkdtempSync(join(tmpdir(), 'scope-nogit-'));
+    writeFileSync(join(plain, 'a.ts'), 'export const a = 1;\n');
+
+    // the fallback baseline used to resolve to an empty tree here, and git
+    // answered with its whole --no-index usage dump
+    await expect(analyze(plain)).rejects.toThrow(/Not a git repository/);
+    await expect(analyze(plain)).rejects.not.toThrow(/usage: git diff/);
+
+    rmSync(plain, { recursive: true, force: true });
+  });
+});

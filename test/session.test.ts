@@ -38,24 +38,27 @@ describe('startSession', () => {
     expect(existsSync(join(repo, '.scope', 'session.json'))).toBe(true);
   });
 
-  it('adds .scope/ to gitignore so session state is never committed', async () => {
+  it('makes .scope/ ignore itself instead of editing the repo gitignore', async () => {
+    writeFileSync(join(repo, '.gitignore'), 'node_modules/\n');
     await startSession(repo, 'task', { globs: [], domains: [] });
-    expect(readFileSync(join(repo, '.gitignore'), 'utf8')).toContain('.scope/');
+
+    // the self-ignoring directory keeps session state out of git
+    expect(readFileSync(join(repo, '.scope', '.gitignore'), 'utf8').trim()).toBe('*');
+
+    // and the repo's own gitignore is left exactly as it was, so Scope does
+    // not report its own setup as a change in the next analysis
+    expect(readFileSync(join(repo, '.gitignore'), 'utf8')).toBe('node_modules/\n');
   });
 
-  it('does not duplicate the gitignore entry', async () => {
-    writeFileSync(join(repo, '.gitignore'), 'node_modules/\n.scope/\n');
+  it('leaves the working tree clean after starting a session', async () => {
+    // beforeEach already committed everything, so the tree starts clean
     await startSession(repo, 'task', { globs: [], domains: [] });
-    const lines = readFileSync(join(repo, '.gitignore'), 'utf8').split('\n');
-    expect(lines.filter((l) => l.trim() === '.scope/').length).toBe(1);
-  });
 
-  it('does not mangle a gitignore that lacks a trailing newline', async () => {
-    writeFileSync(join(repo, '.gitignore'), 'node_modules/');
-    await startSession(repo, 'task', { globs: [], domains: [] });
-    const lines = readFileSync(join(repo, '.gitignore'), 'utf8').split('\n');
-    expect(lines).toContain('node_modules/');
-    expect(lines).toContain('.scope/');
+    const status = execFileSync('git', ['status', '--porcelain'], {
+      cwd: repo,
+      encoding: 'utf8',
+    }).trim();
+    expect(status).toBe('');
   });
 });
 

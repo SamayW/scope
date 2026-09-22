@@ -1,6 +1,6 @@
 export * from './types.js';
 export { analyze } from './analyze.js';
-export { getHeadSha, getRawDiff } from './git.js';
+export { getHeadSha, getRawDiff, getRepoRoot, isGitRepo } from './git.js';
 export { parseHunks } from './diff.js';
 export { classify } from './classify.js';
 export { scoreHunk, toLevel, SECRET_PATTERNS } from './risk.js';
@@ -8,5 +8,7 @@ export { isInScope } from './scope.js';
 export { buildGroups } from './group.js';
 export { startSession, loadSession, saveSession, approveHunk } from './session.js';
 export { detectStack } from './stack.js';
-export { selectChecks, runChecks } from './checks.js';
+export { selectChecks } from './checks.js';
+export { runChecks, attachResults } from './runner.js';
+export { revertHunk, revertFile, revertOutOfScope } from './revert.js';
 export { loadPolicy, evaluateGate, DEFAULT_POLICY } from './gate.js';

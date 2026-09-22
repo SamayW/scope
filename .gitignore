@@ -1,6 +1,6 @@
 node_modules/
 out/
 .scope/
-*.vsix
 .DS_Store
 CLAUDE.md
+.vscode-test/
