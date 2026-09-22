@@ -47,3 +47,31 @@ export async function getRawDiff(cwd: string, baseline: string): Promise<string>
 
   return parts.length > 0 ? parts.join('\n') + '\n' : '';
 }
+
+/**
+ * Baseline to use when no session is active: the fork point from the remote
+ * tracking branch if there is one, else the previous commit.
+ */
+export async function getFallbackBaseline(cwd: string): Promise<string> {
+  const git = simpleGit(cwd);
+
+  try {
+    const branch = (await git.revparse(['--abbrev-ref', 'HEAD'])).trim();
+    const remotes = await git.getRemotes();
+    if (remotes.length > 0 && branch && branch !== 'HEAD') {
+      const base = await git.raw(['merge-base', 'HEAD', `${remotes[0].name}/${branch}`]);
+      if (base.trim()) {
+        return base.trim();
+      }
+    }
+  } catch {
+    // no remote, or no tracking branch: fall through
+  }
+
+  try {
+    return (await git.revparse(['HEAD~1'])).trim();
+  } catch {
+    // first commit in the repo: diff against the empty tree
+    return (await git.raw(['hash-object', '-t', 'tree', '/dev/null'])).trim();
+  }
+}
