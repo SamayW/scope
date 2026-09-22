@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Scope</title>
+    <style>
+      :root {
+        --high: var(--vscode-errorForeground, #f14c4c);
+        --medium: var(--vscode-editorWarning-foreground, #cca700);
+        --low: var(--vscode-testing-iconPassed, #4caf50);
+        --muted: var(--vscode-descriptionForeground, #8b8b8b);
+        --border: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 10px 12px 24px;
+        font-family: var(--vscode-font-family);
+        font-size: var(--vscode-font-size, 13px);
+        color: var(--vscode-foreground);
+        background: transparent;
+      }
+
+      button {
+        font-family: inherit;
+        font-size: 12px;
+        border: none;
+        border-radius: 2px;
+        cursor: pointer;
+      }
+
+      .primary {
+        width: 100%;
+        padding: 7px 10px;
+        margin-bottom: 12px;
+        font-weight: 600;
+        color: var(--vscode-button-foreground, #fff);
+        background: var(--vscode-button-background, #0e639c);
+      }
+
+      .primary:hover {
+        background: var(--vscode-button-hoverBackground, #1177bb);
+      }
+
+      .primary.danger {
+        background: var(--high);
+        color: #fff;
+      }
+
+      .ghost {
+        padding: 3px 8px;
+        color: var(--vscode-foreground);
+        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.2));
+      }
+
+      .ghost:hover {
+        background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.35));
+      }
+
+      /* Header */
+      .task {
+        font-weight: 600;
+        margin-bottom: 2px;
+        word-break: break-word;
+      }
+
+      .globs {
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 12px;
+        word-break: break-all;
+      }
+
+      /* Gate banner */
+      .gate {
+        padding: 9px 11px;
+        border-radius: 3px;
+        margin-bottom: 12px;
+        border-left: 3px solid;
+      }
+
+      .gate.blocked {
+        border-color: var(--high);
+        background: color-mix(in srgb, var(--high) 12%, transparent);
+      }
+
+      .gate.clear {
+        border-color: var(--low);
+        background: color-mix(in srgb, var(--low) 12%, transparent);
+      }
+
+      .gate h2 {
+        margin: 0;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+      }
+
+      .gate.blocked h2 {
+        color: var(--high);
+      }
+
+      .gate.clear h2 {
+        color: var(--low);
+      }
+
+      .gate ul {
+        margin: 6px 0 0;
+        padding-left: 16px;
+      }
+
+      .gate li {
+        font-size: 12px;
+        margin-bottom: 2px;
+      }
+
+      /* Group cards */
+      .group {
+        border: 1px solid var(--border);
+        border-left-width: 3px;
+        border-radius: 3px;
+        margin-bottom: 8px;
+        overflow: hidden;
+      }
+
+      .group.high {
+        border-left-color: var(--high);
+      }
+      .group.medium {
+        border-left-color: var(--medium);
+      }
+      .group.low {
+        border-left-color: var(--low);
+      }
+
+      .group-head {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 10px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .group-head:hover {
+        background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+      }
+
+      .chev {
+        color: var(--muted);
+        font-size: 10px;
+        width: 9px;
+      }
+
+      .domain {
+        font-weight: 600;
+      }
+
+      .risk-tag {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+      }
+
+      .risk-tag.high {
+        color: var(--high);
+      }
+      .risk-tag.medium {
+        color: var(--medium);
+      }
+      .risk-tag.low {
+        color: var(--low);
+      }
+
+      .badge {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        padding: 2px 5px;
+        border-radius: 2px;
+        color: #fff;
+        background: var(--high);
+      }
+
+      .count {
+        margin-left: auto;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .group-body {
+        padding: 0 10px 8px;
+      }
+
+      .flag {
+        display: flex;
+        gap: 6px;
+        font-size: 12px;
+        padding: 3px 0;
+        color: var(--vscode-foreground);
+      }
+
+      .flag .dot {
+        color: var(--high);
+      }
+
+      /* Checks */
+      .check {
+        font-size: 11px;
+        padding: 3px 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .check .status {
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.05em;
+        min-width: 46px;
+      }
+
+      .check.pass .status {
+        color: var(--low);
+      }
+      .check.fail .status,
+      .check.timeout .status {
+        color: var(--high);
+      }
+      .check.running .status {
+        color: var(--muted);
+      }
+
+      .check.fail,
+      .check.timeout {
+        cursor: pointer;
+      }
+
+      .check-output {
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 10px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin: 2px 0 6px 52px;
+        padding: 6px 8px;
+        border-radius: 2px;
+        max-height: 170px;
+        overflow: auto;
+        color: var(--muted);
+        background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border: 1.5px solid var(--muted);
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Hunks */
+      /* Two rows: the path gets the full width, actions sit beneath it.
+         On one row the buttons squeeze the directory down to a few letters. */
+      .hunk {
+        font-size: 11px;
+        padding: 5px 0;
+        border-top: 1px solid var(--border);
+      }
+
+      .hunk-actions-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 3px;
+      }
+
+      .hunk .file {
+        font-family: var(--vscode-editor-font-family, monospace);
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      /* the directory gives way, the filename never does */
+      .hunk .dir {
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .hunk .base {
+        white-space: nowrap;
+      }
+
+      .stat {
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .stat .plus {
+        color: var(--low);
+      }
+      .stat .minus {
+        color: var(--high);
+      }
+
+      .hunk-actions {
+        display: flex;
+        gap: 3px;
+        margin-left: auto;
+      }
+
+      .section-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        color: var(--muted);
+        margin: 8px 0 3px;
+      }
+
+      .empty {
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+        padding: 26px 10px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      footer {
+        margin-top: 12px;
+        display: flex;
+        gap: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      const vscode = acquireVsCodeApi();
+
+      let analysis = null;
+      let checks = [];
+      let results = {};
+      let gate = null;
+
+      const collapsed = new Set();
+      const expandedOutput = new Set();
+
+      const RISKS = { high: 0, medium: 1, low: 2 };
+
+      function esc(value) {
+        return String(value).replace(
+          /[&<>"']/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+        );
+      }
+
+      function send(type, hunkId) {
+        vscode.postMessage({ type, hunkId });
+      }
+
+      // Checks marked 'any' cover the whole diff. Repeating them inside every
+      // card is just noise, so they render once above the groups.
+      function globalChecks() {
+        return checks.filter((c) => c.domains === 'any');
+      }
+
+      function checksFor(domain) {
+        return checks.filter((c) => c.domains !== 'any' && c.domains.indexOf(domain) !== -1);
+      }
+
+      function renderHeader() {
+        if (!analysis || !analysis.session) {
+          return `
+            <div class="task">No active task</div>
+            <div class="globs">Scope is watching everything until you start one.</div>
+            <button class="primary" data-act="start">Start task</button>`;
+        }
+        const globs = analysis.session.allow.globs;
+        return `
+          <div class="task">${esc(analysis.session.task)}</div>
+          <div class="globs">${globs.length ? esc(globs.join('  ')) : 'no paths allowed'}</div>`;
+      }
+
+      function renderGate() {
+        if (!gate) return '';
+        if (!gate.blocked) {
+          return `<div class="gate clear"><h2>READY TO PUSH</h2></div>`;
+        }
+        const reasons = gate.reasons
+          .map((r) => `<li>${esc(r.message)}</li>`)
+          .join('');
+        return `<div class="gate blocked"><h2>BLOCKED</h2><ul>${reasons}</ul></div>`;
+      }
+
+      function renderRevertAll() {
+        const any = analysis && analysis.groups.some((g) => g.outOfScope);
+        if (!any) return '';
+        return `<button class="primary danger" data-act="revertOutOfScope">Revert all out-of-scope changes</button>`;
+      }
+
+      function renderCheck(check) {
+        const result = results[check.id];
+        const status = result ? result.status : 'running';
+        const failed = status === 'fail' || status === 'timeout';
+        const open = expandedOutput.has(check.id);
+        const label = result ? status.toUpperCase() : '';
+
+        const mark = result
+          ? `<span class="status">${label}</span>`
+          : `<span class="status"><span class="spinner"></span></span>`;
+
+        const output =
+          failed && open && result.output
+            ? `<div class="check-output">${esc(result.output)}</div>`
+            : '';
+
+        return `
+          <div class="check ${status}" ${failed ? `data-check="${esc(check.id)}"` : ''}>
+            ${mark}<span>${esc(check.label)}</span>
+          </div>${output}`;
+      }
+
+      function renderHunk(hunk) {
+        const cut = hunk.file.lastIndexOf('/') + 1;
+        return `
+          <div class="hunk">
+            <span class="file" title="${esc(hunk.file)}"><span class="dir">${esc(
+              hunk.file.slice(0, cut)
+            )}</span><span class="base">${esc(hunk.file.slice(cut))}</span></span>
+            <div class="hunk-actions-row">
+              <span class="stat"><span class="plus">+${hunk.added.length}</span>
+                <span class="minus">-${hunk.removed.length}</span></span>
+              <span class="hunk-actions">
+                <button class="ghost" data-act="openDiff" data-hunk="${esc(hunk.id)}">Diff</button>
+                <button class="ghost" data-act="approve" data-hunk="${esc(hunk.id)}">Approve</button>
+                <button class="ghost" data-act="revertHunk" data-hunk="${esc(hunk.id)}">Revert</button>
+              </span>
+            </div>
+          </div>`;
+      }
+
+      function renderGroup(group) {
+        const open = !collapsed.has(group.domain);
+        const groupChecks = checksFor(group.domain);
+        const flags = group.hunks.reduce((all, h) => all.concat(h.flags), []);
+
+        const body = open
+          ? `
+            <div class="group-body">
+              ${flags.map((f) => `<div class="flag"><span class="dot">-</span><span>${esc(f.message)}</span></div>`).join('')}
+              ${groupChecks.length ? `<div class="section-label">CHECKS</div>` : ''}
+              ${groupChecks.map(renderCheck).join('')}
+              <div class="section-label">CHANGES</div>
+              ${group.hunks.map(renderHunk).join('')}
+            </div>`
+          : '';
+
+        return `
+          <div class="group ${group.risk}">
+            <div class="group-head" data-group="${esc(group.domain)}">
+              <span class="chev">${open ? '&#9660;' : '&#9654;'}</span>
+              <span class="domain">${esc(group.domain)}</span>
+              <span class="risk-tag ${group.risk}">${group.risk.toUpperCase()}</span>
+              ${group.outOfScope ? '<span class="badge">OUT OF SCOPE</span>' : ''}
+              <span class="count">${group.hunks.length}</span>
+            </div>
+            ${body}
+          </div>`;
+      }
+
+      function render() {
+        const groups = analysis ? [...analysis.groups] : [];
+        groups.sort((a, b) => RISKS[a.risk] - RISKS[b.risk] || b.score - a.score);
+
+        const body =
+          analysis && groups.length === 0
+            ? `<div class="empty">No changes against the baseline.</div>`
+            : groups.map(renderGroup).join('');
+
+        const whole = globalChecks();
+        const wholeSection = whole.length
+          ? `<div class="section-label">WHOLE DIFF</div>${whole.map(renderCheck).join('')}
+             <div style="height:10px"></div>`
+          : '';
+
+        document.getElementById('app').innerHTML = `
+          ${renderHeader()}
+          ${renderGate()}
+          ${renderRevertAll()}
+          ${wholeSection}
+          ${analysis ? body : '<div class="empty">Run a refresh to analyze the working tree.</div>'}
+          <footer><button class="ghost" data-act="refresh">Refresh</button></footer>`;
+      }
+
+      document.addEventListener('click', (event) => {
+        const actionEl = event.target.closest('[data-act]');
+        if (actionEl) {
+          send(actionEl.dataset.act, actionEl.dataset.hunk);
+          return;
+        }
+
+        const checkEl = event.target.closest('[data-check]');
+        if (checkEl) {
+          const id = checkEl.dataset.check;
+          if (expandedOutput.has(id)) expandedOutput.delete(id);
+          else expandedOutput.add(id);
+          render();
+          return;
+        }
+
+        const groupEl = event.target.closest('[data-group]');
+        if (groupEl) {
+          const domain = groupEl.dataset.group;
+          if (collapsed.has(domain)) collapsed.delete(domain);
+          else collapsed.add(domain);
+          render();
+        }
+      });
+
+      window.addEventListener('message', (event) => {
+        const message = event.data;
+        if (message.type === 'analysis') {
+          analysis = message.data;
+          checks = [];
+          results = {};
+          gate = null;
+        } else if (message.type === 'checksStarted') {
+          checks = message.data;
+          results = {};
+        } else if (message.type === 'checkResult') {
+          results[message.data.checkId] = message.data;
+        } else if (message.type === 'gate') {
+          gate = message.data;
+        }
+        render();
+      });
+
+      render();
+      vscode.postMessage({ type: 'ready' });
+    </script>
+  </body>
+</html>
