@@ -127,6 +127,27 @@ suite('Scope extension host', () => {
     assert.ok(tab?.input instanceof vscode.TabInputTextDiff, 'no diff tab without a session');
   });
 
+  test('scope.openDiff works on a file the agent deleted', async () => {
+    // close everything first: a leftover diff tab from another test made this
+    // pass while the command was in fact failing
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    await vscode.commands.executeCommand('scope.refresh');
+
+    const onDisk = join(root(), 'src', 'app', 'signup', 'signup.test.ts');
+    assert.ok(!existsSync(onDisk), 'expected the test file to be deleted');
+
+    await vscode.commands.executeCommand('scope.openDiff', 'src/app/signup/signup.test.ts#0');
+
+    const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    assert.ok(tab, 'no tab opened at all for the deleted file');
+    assert.ok(tab.input instanceof vscode.TabInputTextDiff, `expected a diff tab, got ${tab.label}`);
+
+    const input = tab.input as vscode.TabInputTextDiff;
+    assert.ok(input.original.path.includes('signup.test.ts'), 'diff is not of the deleted file');
+    // the right side must be virtual, since the file is gone
+    assert.strictEqual(input.modified.scheme, 'scope-base');
+  });
+
   test('the sidebar webview html loads from media', () => {
     const extension = vscode.extensions.getExtension(EXTENSION_ID)!;
     const html = join(extension.extensionPath, 'media', 'ui.html');

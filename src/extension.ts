@@ -23,6 +23,14 @@ import type {
 } from './core/types.js';
 
 const BASE_SCHEME = 'scope-base';
+
+/**
+ * Query marker for "this side of the diff is nothing".
+ * A deleted file has no working-tree copy and an added file has no baseline
+ * copy, so one side has to be a virtual empty document rather than a file on
+ * disk that does not exist.
+ */
+const EMPTY_SIDE = '__empty__';
 const DOMAINS: Domain[] = ['auth', 'db', 'deps', 'tests', 'config', 'api', 'ui', 'other'];
 
 let panel: ScopePanel;
@@ -378,6 +386,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // Left-hand side of the diff view: the file as it was at the baseline.
   const baseProvider = vscode.workspace.registerTextDocumentContentProvider(BASE_SCHEME, {
     async provideTextDocumentContent(uri) {
+      if (uri.query === EMPTY_SIDE) {
+        return '';
+      }
+
       const cwd = root();
       if (!cwd) {
         return '';
@@ -474,15 +486,29 @@ export function activate(context: vscode.ExtensionContext): void {
       // meaningful against the fork point. This used to return silently.
       const baseline = latest?.session?.baseline ?? (await getFallbackBaseline(target.cwd));
 
-      const left = vscode.Uri.parse(`${BASE_SCHEME}:/${target.hunk.file}?${baseline}`);
-      const right = vscode.Uri.file(join(target.cwd, target.hunk.file));
+      const file = target.hunk.file;
+      const deleted = target.hunk.fileStatus === 'deleted';
+      const added = target.hunk.fileStatus === 'added';
 
-      log(`openDiff ${target.hunk.file} against ${baseline.slice(0, 8)}`);
+      // A deleted file has nothing on disk to show on the right, and an added
+      // file has nothing at the baseline to show on the left. Pointing either
+      // at a real path produces "Unable to resolve nonexistent file".
+      const left = added
+        ? vscode.Uri.parse(`${BASE_SCHEME}:/${file}?${EMPTY_SIDE}`)
+        : vscode.Uri.parse(`${BASE_SCHEME}:/${file}?${baseline}`);
+
+      const right = deleted
+        ? vscode.Uri.parse(`${BASE_SCHEME}:/${file}?${EMPTY_SIDE}`)
+        : vscode.Uri.file(join(target.cwd, file));
+
+      const suffix = deleted ? ' (deleted)' : added ? ' (added)' : '';
+
+      log(`openDiff ${file}${suffix} against ${baseline.slice(0, 8)}`);
       await vscode.commands.executeCommand(
         'vscode.diff',
         left,
         right,
-        `${target.hunk.file} (Scope)`
+        `${file} (Scope)${suffix}`
       );
     }),
 
