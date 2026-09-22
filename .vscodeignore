@@ -2,8 +2,11 @@
 src/**
 !media/**
 test/**
-node_modules/**
 tsconfig.json
 vitest.config.mts
 **/*.map
 out/itest/**
+scripts/**
+.vscode-test/**
+fixtures/sample.diff
+*.vsix

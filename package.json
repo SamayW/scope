@@ -108,7 +108,8 @@
     "test": "vitest run",
     "itest": "tsc -p ./ && node out/itest/runTest.js",
     "demo:reset": "bash scripts/demo-reset.sh",
-    "demo:agent": "bash scripts/demo-agent.sh"
+    "demo:agent": "bash scripts/demo-agent.sh",
+    "package": "vsce package"
   },
   "dependencies": {
     "commander": "^14.0.3",
@@ -123,9 +124,16 @@
     "@types/node": "^26.6.2",
     "@types/vscode": "^1.90.0",
     "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
     "glob": "^13.0.6",
     "mocha": "^12.0.2",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
+  },
+  "publisher": "samay",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SamayW/scope.git"
   }
 }
