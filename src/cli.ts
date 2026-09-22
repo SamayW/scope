@@ -2,7 +2,8 @@
 import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { analyze } from './core/analyze.js';
-import { selectChecks, runChecks } from './core/checks.js';
+import { selectChecks } from './core/checks.js';
+import { runChecks } from './core/runner.js';
 import { loadPolicy, evaluateGate } from './core/gate.js';
 import { getRepoRoot } from './core/git.js';
 import { detectStack } from './core/stack.js';

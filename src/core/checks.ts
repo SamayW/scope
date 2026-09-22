@@ -1,4 +1,4 @@
-import type { Analysis, Check, CheckResult, Domain, Policy, Stack } from './types.js';
+import type { Analysis, Check, Domain, Policy, Stack } from './types.js';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const TEST_TIMEOUT_MS = 120_000;
@@ -125,34 +125,4 @@ export function selectChecks(stack: Stack, analysis: Analysis, policy: Policy): 
   }
 
   return checks;
-}
-
-/** Dev B. STUB: returns fixed results without running anything. */
-export async function runChecks(checks: Check[], cwd: string): Promise<CheckResult[]> {
-  return [
-    {
-      checkId: 'tsc',
-      label: 'tsc --noEmit',
-      status: 'pass',
-      exitCode: 0,
-      durationMs: 1840,
-      output: 'No type errors found.',
-    },
-    {
-      checkId: 'prisma-validate',
-      label: 'prisma validate',
-      status: 'fail',
-      exitCode: 1,
-      durationMs: 620,
-      output: 'Error validating model "User": This field declaration is invalid.',
-    },
-    {
-      checkId: 'vitest-related',
-      label: 'vitest related',
-      status: 'pass',
-      exitCode: 0,
-      durationMs: 2310,
-      output: 'No related tests to run.',
-    },
-  ];
 }

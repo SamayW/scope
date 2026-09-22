@@ -8,5 +8,6 @@ export { isInScope } from './scope.js';
 export { buildGroups } from './group.js';
 export { startSession, loadSession, saveSession, approveHunk } from './session.js';
 export { detectStack } from './stack.js';
-export { selectChecks, runChecks } from './checks.js';
+export { selectChecks } from './checks.js';
+export { runChecks, attachResults } from './runner.js';
 export { loadPolicy, evaluateGate, DEFAULT_POLICY } from './gate.js';
