@@ -7,6 +7,8 @@ SCOPE="$(cd "$(dirname "$0")/.." && pwd)"
 DEMO="$SCOPE/../scope-demo"
 
 cd "$DEMO"
+# a rehearsal that stopped mid cherry-pick would otherwise block the reset
+git cherry-pick --abort 2>/dev/null || true
 git checkout -q -B demo demo-base
 # hard reset, not just a checkout: a previous rehearsal may have left tracked
 # files modified, and those would show up as phantom changes in the demo
