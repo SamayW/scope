@@ -1,7 +1,7 @@
 // The Scope contract. Shared by core, the CLI, and the VS Code extension.
 // This file must never import the vscode module, so the CLI and the git hook can use it.
 
-export type Risk = 'high' | 'medium' | 'low';
+export type RiskLevel = 'high' | 'medium' | 'low';
 
 export type Domain =
   | 'auth'
@@ -13,64 +13,76 @@ export type Domain =
   | 'ui'
   | 'other';
 
+export type FileStatus = 'added' | 'deleted' | 'renamed' | 'modified';
+
 export type FlagId =
   | 'deleted-test'
-  | 'skipped-test'
+  | 'skip-only'
   | 'removed-assertion'
   | 'secret'
-  | 'env-edit'
-  | 'auth-change'
-  | 'schema-change'
-  | 'removed-validation'
+  | 'env-file'
+  | 'sensitive-domain'
   | 'new-dependency'
-  | 'eslint-disable'
-  | 'any-type'
+  | 'lint-suppression'
   | 'empty-catch'
-  | 'ci-edit';
+  | 'ci-change';
 
-export interface Flag {
+export interface RiskFlag {
   id: FlagId;
   message: string;
-  risk: Risk;
-  file: string;
-  line?: number;
+  points: number;
 }
 
+/**
+ * One chunk of one file. `added` and `removed` hold the changed lines with
+ * their +/- prefix stripped, so the risk rules can match against content.
+ */
 export interface Hunk {
   id: string;
   file: string;
-  domain: Domain;
-  added: number;
-  removed: number;
+  fileStatus: FileStatus;
+  added: string[];
+  removed: string[];
+  /**
+   * Headers plus body, ending in a newline. Must stay applyable: the extension
+   * pipes this into `git apply -R` to revert a single hunk.
+   */
   patch: string;
-  inScope: boolean;
-  flags: Flag[];
+}
+
+export interface ClassifiedHunk extends Hunk {
+  domain: Domain;
+  flags: RiskFlag[];
   score: number;
+  inScope: boolean;
+  approved: boolean;
 }
 
 export interface Group {
   domain: Domain;
-  risk: Risk;
+  risk: RiskLevel;
   score: number;
-  inScope: boolean;
-  approved: boolean;
-  hunks: Hunk[];
-  flags: Flag[];
+  outOfScope: boolean;
+  hunks: ClassifiedHunk[];
+  checks: CheckResult[];
 }
 
 export interface Session {
   task: string;
   baseline: string;
-  allowGlobs: string[];
-  allowDomains: Domain[];
-  approvedHunks: string[];
+  allow: {
+    globs: string[];
+    domains: Domain[];
+  };
+  approved: string[];
   createdAt: string;
 }
 
+/** `session` is null when no session is active, in which case everything is in scope. */
 export interface Analysis {
-  session: Session;
+  session: Session | null;
   groups: Group[];
-  generatedAt: string;
+  changedFiles: string[];
 }
 
 export type CheckId =
@@ -94,6 +106,8 @@ export type CheckStatus = 'pass' | 'fail' | 'skip' | 'timeout';
 
 export interface CheckResult {
   checkId: CheckId;
+  /** Carried on the result so the gate can name the check without the Check list. */
+  label: string;
   status: CheckStatus;
   exitCode: number | null;
   durationMs: number;
@@ -110,18 +124,20 @@ export interface Stack {
   docker: boolean;
 }
 
-export type GateReasonKind =
-  | 'check-failed'
-  | 'deleted-test'
-  | 'secret'
-  | 'out-of-scope';
+export type BlockRule = 'failing_checks' | 'deleted_tests' | 'secrets' | 'out_of_scope';
+
+export interface Policy {
+  blockOn: BlockRule[];
+  /** Optional per-domain command overrides from .scope.yml. */
+  groups?: Record<string, string[]>;
+}
 
 export interface GateReason {
-  kind: GateReasonKind;
+  kind: BlockRule;
   message: string;
 }
 
-export interface Gate {
+export interface GateResult {
   blocked: boolean;
   reasons: GateReason[];
 }

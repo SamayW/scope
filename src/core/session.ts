@@ -1,16 +1,22 @@
-import type { Session } from './types.js';
+import type { Domain, Session } from './types.js';
 
-/** Creates a session pinned to the current HEAD as baseline. */
-export function startSession(repoRoot: string, task: string, allowGlobs: string[]): Session {
+/** Creates .scope/session.json pinned to the current HEAD. */
+export async function startSession(
+  cwd: string,
+  task: string,
+  allow: Session['allow']
+): Promise<Session> {
   throw new Error('not implemented');
 }
 
-/** Reads .scope/session.json, or null when no session is active. */
-export function loadSession(repoRoot: string): Session | null {
+export function loadSession(cwd: string): Session | null {
   throw new Error('not implemented');
 }
 
-/** Writes .scope/session.json. */
-export function saveSession(repoRoot: string, session: Session): void {
+export function saveSession(cwd: string, session: Session): void {
+  throw new Error('not implemented');
+}
+
+export function approveHunk(cwd: string, hunkId: string): void {
   throw new Error('not implemented');
 }

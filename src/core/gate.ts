@@ -1,25 +1,26 @@
-import type { CheckResult, Gate, Group, Session } from './types.js';
+import type { Analysis, CheckResult, GateResult, Policy } from './types.js';
 
-/**
- * STUB (M0): returns a fixed blocked verdict with readable reasons.
- * Real version applies the block_on policy from .scope.yml.
- */
-export function evaluateGate(groups: Group[], results: CheckResult[], session: Session): Gate {
+export const DEFAULT_POLICY: Policy = {
+  blockOn: ['failing_checks', 'deleted_tests', 'secrets', 'out_of_scope'],
+};
+
+/** STUB until A9: always the default policy. */
+export function loadPolicy(cwd: string): Policy {
+  return DEFAULT_POLICY;
+}
+
+/** STUB until A9: fixed blocked verdict. */
+export function evaluateGate(
+  analysis: Analysis,
+  results: CheckResult[],
+  policy: Policy
+): GateResult {
   return {
     blocked: true,
     reasons: [
-      {
-        kind: 'check-failed',
-        message: 'prisma validate failed: field "isAdmin" is missing a type in prisma/schema.prisma',
-      },
-      {
-        kind: 'deleted-test',
-        message: 'src/app/signup/signup.test.ts was deleted',
-      },
-      {
-        kind: 'out-of-scope',
-        message: 'auth, db and tests changed outside the allowed scope src/app/signup/**',
-      },
+      { kind: 'failing_checks', message: 'Check failed: prisma validate' },
+      { kind: 'deleted_tests', message: 'src/app/signup/signup.test.ts was deleted' },
+      { kind: 'out_of_scope', message: 'auth, db and tests changed outside the allowed scope' },
     ],
   };
 }
