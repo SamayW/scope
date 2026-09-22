@@ -3,6 +3,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
 
+// read from package.json so adding or changing the publisher cannot silently
+// break this suite again
+const EXTENSION_ID = `${require('../../../package.json').publisher}.${require('../../../package.json').name}`;
+
 const EXPECTED_COMMANDS = [
   'scope.start',
   'scope.refresh',
@@ -20,13 +24,13 @@ function root(): string {
 
 suite('Scope extension host', () => {
   suiteSetup(async () => {
-    const extension = vscode.extensions.getExtension('undefined_publisher.scope');
+    const extension = vscode.extensions.getExtension(EXTENSION_ID);
     assert.ok(extension, 'extension not found in the host');
     await extension.activate();
   });
 
   test('activates without throwing', () => {
-    const extension = vscode.extensions.getExtension('undefined_publisher.scope')!;
+    const extension = vscode.extensions.getExtension(EXTENSION_ID)!;
     assert.strictEqual(extension.isActive, true);
   });
 
@@ -92,7 +96,7 @@ suite('Scope extension host', () => {
   });
 
   test('the sidebar webview html loads from media', () => {
-    const extension = vscode.extensions.getExtension('undefined_publisher.scope')!;
+    const extension = vscode.extensions.getExtension(EXTENSION_ID)!;
     const html = join(extension.extensionPath, 'media', 'ui.html');
     assert.ok(existsSync(html), 'media/ui.html is missing from the packaged extension');
     assert.ok(readFileSync(html, 'utf8').includes('acquireVsCodeApi'));
