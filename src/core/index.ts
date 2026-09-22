@@ -10,4 +10,5 @@ export { startSession, loadSession, saveSession, approveHunk } from './session.j
 export { detectStack } from './stack.js';
 export { selectChecks } from './checks.js';
 export { runChecks, attachResults } from './runner.js';
+export { revertHunk, revertFile, revertOutOfScope } from './revert.js';
 export { loadPolicy, evaluateGate, DEFAULT_POLICY } from './gate.js';
