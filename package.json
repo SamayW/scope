@@ -16,13 +16,44 @@
   "bin": {
     "scope": "./out/cli.js"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:scope.sidebar",
+    "workspaceContains:.git"
+  ],
   "contributes": {
     "commands": [
+      {
+        "command": "scope.start",
+        "title": "Scope: Start Task"
+      },
       {
         "command": "scope.refresh",
         "title": "Scope: Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "scope.openDiff",
+        "title": "Scope: Open Diff"
+      },
+      {
+        "command": "scope.approve",
+        "title": "Scope: Approve Hunk"
+      },
+      {
+        "command": "scope.revertHunk",
+        "title": "Scope: Revert Hunk"
+      },
+      {
+        "command": "scope.revertOutOfScope",
+        "title": "Scope: Revert All Out-of-Scope Changes"
+      },
+      {
+        "command": "scope.installHook",
+        "title": "Scope: Install Pre-Push Hook"
+      },
+      {
+        "command": "scope.focus",
+        "title": "Scope: Focus Sidebar"
       }
     ],
     "viewsContainers": {
@@ -49,6 +80,24 @@
           "command": "scope.refresh",
           "when": "view == scope.sidebar",
           "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "scope.openDiff",
+          "when": "false"
+        },
+        {
+          "command": "scope.approve",
+          "when": "false"
+        },
+        {
+          "command": "scope.revertHunk",
+          "when": "false"
+        },
+        {
+          "command": "scope.focus",
+          "when": "false"
         }
       ]
     }
