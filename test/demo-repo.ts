@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -12,4 +13,48 @@ import { resolve } from 'node:path';
  */
 export const DEMO_REPO = resolve(__dirname, '../../scope-demo');
 
-export const hasDemoRepo = existsSync(resolve(DEMO_REPO, '.git'));
+/** The branches the demo scenario is built from. */
+const BRANCHES = ['demo-base', 'demo-agent', 'base', 'agent'];
+
+function resolves(cwd: string, ref: string): boolean {
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '-q', `${ref}^{commit}`], {
+      cwd,
+      stdio: 'pipe',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const hasDemoRepo =
+  existsSync(resolve(DEMO_REPO, '.git')) &&
+  BRANCHES.every((b) => resolves(DEMO_REPO, b) || resolves(DEMO_REPO, `origin/${b}`));
+
+/**
+ * Clones the demo repo for a test to mutate freely.
+ *
+ * `git clone` copies the source's local branches but not its remote-tracking
+ * refs, so cloning a repository that was itself freshly cloned leaves the demo
+ * branches behind entirely. Each one is pulled across explicitly when the plain
+ * clone did not bring it.
+ */
+export function cloneDemo(dest: string): void {
+  execFileSync('git', ['clone', '-q', DEMO_REPO, dest], { stdio: 'pipe' });
+
+  for (const branch of BRANCHES) {
+    if (resolves(dest, `refs/heads/${branch}`)) {
+      continue;
+    }
+    try {
+      execFileSync(
+        'git',
+        ['fetch', '-q', DEMO_REPO, `refs/remotes/origin/${branch}:refs/heads/${branch}`],
+        { cwd: dest, stdio: 'pipe' }
+      );
+    } catch {
+      // nothing more to try; hasDemoRepo will have skipped the suite already
+    }
+  }
+}

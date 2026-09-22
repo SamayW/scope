@@ -115,7 +115,7 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && chmod +x out/cli.js",
     "watch": "tsc -watch -p ./",
     "test": "vitest run",
     "itest": "tsc -p ./ && node out/itest/runTest.js",

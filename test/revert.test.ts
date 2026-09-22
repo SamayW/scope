@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { analyze } from '../src/core/analyze.js';
 import { revertHunk, revertFile, revertOutOfScope } from '../src/core/revert.js';
 import type { Session } from '../src/core/types.js';
-import { DEMO_REPO as DEMO, hasDemoRepo } from './demo-repo.js';
+import { cloneDemo, hasDemoRepo } from './demo-repo.js';
 
 let clone: string;
 let baseSha: string;
@@ -29,10 +29,10 @@ function writeSession(allow: Session['allow']): void {
 
 beforeEach(() => {
   clone = mkdtempSync(join(tmpdir(), 'scope-revert-'));
-  execFileSync('git', ['clone', '-q', DEMO, clone]);
+  cloneDemo(clone);
   // the fixed demo lineage, built locally
-  git('checkout', '-q', '-b', 'demo-agent', 'origin/demo-agent');
-  baseSha = git('rev-parse', 'origin/demo-base').trim();
+  git('checkout', '-q', 'demo-agent');
+  baseSha = git('rev-parse', 'demo-base').trim();
   writeSession({ globs: ['src/app/signup/*.tsx'], domains: [] });
 });
 

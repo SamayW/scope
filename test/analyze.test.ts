@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { analyze } from '../src/core/analyze.js';
 import type { Analysis, Session } from '../src/core/types.js';
-import { DEMO_REPO as DEMO, hasDemoRepo } from './demo-repo.js';
+import { cloneDemo, hasDemoRepo } from './demo-repo.js';
 
 let clone: string;
 let baseSha: string;
@@ -25,7 +25,7 @@ function writeSession(allow: Session['allow']): void {
 beforeAll(() => {
   // Clone so the real demo repo is never touched.
   clone = mkdtempSync(join(tmpdir(), 'scope-analyze-'));
-  execFileSync('git', ['clone', '-q', DEMO, clone]);
+  cloneDemo(clone);
   execFileSync('git', ['checkout', '-q', 'agent'], { cwd: clone });
   baseSha = execFileSync('git', ['rev-parse', 'base'], { cwd: clone, encoding: 'utf8' }).trim();
 });
