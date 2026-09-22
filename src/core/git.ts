@@ -1,11 +1,49 @@
-/** Reads raw diffs out of git. The only module here that shells out. */
+import execa from 'execa';
+import { simpleGit } from 'simple-git';
 
 /** SHA of the current HEAD. */
 export async function getHeadSha(cwd: string): Promise<string> {
-  throw new Error('not implemented');
+  const sha = await simpleGit(cwd).revparse(['HEAD']);
+  return sha.trim();
 }
 
-/** Tracked changes against the baseline, plus untracked files, as one diff string. */
+/** Absolute path to the repository root, so the CLI works from any subfolder. */
+export async function getRepoRoot(cwd: string): Promise<string> {
+  const root = await simpleGit(cwd).revparse(['--show-toplevel']);
+  return root.trim();
+}
+
+/**
+ * Tracked changes against the baseline plus untracked files, concatenated
+ * into a single diff string.
+ */
 export async function getRawDiff(cwd: string, baseline: string): Promise<string> {
-  throw new Error('not implemented');
+  const git = simpleGit(cwd);
+  const parts: string[] = [];
+
+  const tracked = await git.diff([baseline]);
+  if (tracked.trim()) {
+    parts.push(tracked.trimEnd());
+  }
+
+  const listed = await git.raw(['ls-files', '--others', '--exclude-standard']);
+  const untracked = listed
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const file of untracked) {
+    // `git diff --no-index` exits 1 when the files differ, which is the normal
+    // case here. simple-git raises that as an error, so use execa and ignore
+    // the exit code.
+    const result = await execa('git', ['diff', '--no-index', '--', '/dev/null', file], {
+      cwd,
+      reject: false,
+    });
+    if (result.stdout.trim()) {
+      parts.push(result.stdout.trimEnd());
+    }
+  }
+
+  return parts.length > 0 ? parts.join('\n') + '\n' : '';
 }
