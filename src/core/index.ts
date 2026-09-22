@@ -1,0 +1,10 @@
+export * from './types.js';
+export { analyze } from './analyze.js';
+export { getDiff, parseHunks } from './diff.js';
+export { classifyHunk, groupHunks } from './classify.js';
+export { scoreHunk, scoreGroup } from './risk.js';
+export { matchScope, applyScope } from './scope.js';
+export { detectStack } from './stack.js';
+export { selectChecks, runChecks } from './checks.js';
+export { evaluateGate } from './gate.js';
+export { startSession, loadSession, saveSession } from './session.js';

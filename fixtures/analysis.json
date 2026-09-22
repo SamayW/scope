@@ -1,0 +1,143 @@
+{
+  "session": {
+    "task": "add signup form validation",
+    "baseline": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "allowGlobs": ["src/app/signup/**"],
+    "allowDomains": ["ui"],
+    "approvedHunks": [],
+    "createdAt": "2026-09-22T09:00:00.000Z"
+  },
+  "generatedAt": "2026-09-22T09:12:44.000Z",
+  "groups": [
+    {
+      "domain": "auth",
+      "risk": "high",
+      "score": 90,
+      "inScope": false,
+      "approved": false,
+      "flags": [
+        {
+          "id": "auth-change",
+          "message": "Middleware returns NextResponse.next() before the session check, disabling auth for every route",
+          "risk": "high",
+          "file": "src/middleware.ts",
+          "line": 5
+        }
+      ],
+      "hunks": [
+        {
+          "id": "auth-0001",
+          "file": "src/middleware.ts",
+          "domain": "auth",
+          "added": 1,
+          "removed": 0,
+          "inScope": false,
+          "score": 90,
+          "flags": [
+            {
+              "id": "auth-change",
+              "message": "Middleware returns NextResponse.next() before the session check, disabling auth for every route",
+              "risk": "high",
+              "file": "src/middleware.ts",
+              "line": 5
+            }
+          ],
+          "patch": "diff --git a/src/middleware.ts b/src/middleware.ts\nindex 3f1a2b4..8c9d0e1 100644\n--- a/src/middleware.ts\n+++ b/src/middleware.ts\n@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';\n import type { NextRequest } from 'next/server';\n \n export function middleware(request: NextRequest) {\n+  return NextResponse.next();\n   const session = request.cookies.get('session');\n \n   if (!session) {\n"
+        }
+      ]
+    },
+    {
+      "domain": "tests",
+      "risk": "high",
+      "score": 80,
+      "inScope": false,
+      "approved": false,
+      "flags": [
+        {
+          "id": "deleted-test",
+          "message": "Test file deleted instead of fixed",
+          "risk": "high",
+          "file": "src/app/signup/signup.test.ts"
+        }
+      ],
+      "hunks": [
+        {
+          "id": "tests-0001",
+          "file": "src/app/signup/signup.test.ts",
+          "domain": "tests",
+          "added": 0,
+          "removed": 9,
+          "inScope": false,
+          "score": 80,
+          "flags": [
+            {
+              "id": "deleted-test",
+              "message": "Test file deleted instead of fixed",
+              "risk": "high",
+              "file": "src/app/signup/signup.test.ts"
+            }
+          ],
+          "patch": "diff --git a/src/app/signup/signup.test.ts b/src/app/signup/signup.test.ts\ndeleted file mode 100644\nindex 7b2c1d9..0000000\n--- a/src/app/signup/signup.test.ts\n+++ /dev/null\n@@ -1,9 +0,0 @@\n-import { describe, it, expect } from 'vitest';\n-import { validateEmail } from './validate';\n-\n-describe('signup', () => {\n-  it('rejects an email without an @', () => {\n-    expect(validateEmail('nope')).toBe(false);\n-  });\n-});\n-\n"
+        }
+      ]
+    },
+    {
+      "domain": "db",
+      "risk": "high",
+      "score": 70,
+      "inScope": false,
+      "approved": false,
+      "flags": [
+        {
+          "id": "schema-change",
+          "message": "Schema field added with no type, prisma validate fails",
+          "risk": "high",
+          "file": "prisma/schema.prisma",
+          "line": 16
+        }
+      ],
+      "hunks": [
+        {
+          "id": "db-0001",
+          "file": "prisma/schema.prisma",
+          "domain": "db",
+          "added": 1,
+          "removed": 0,
+          "inScope": false,
+          "score": 70,
+          "flags": [
+            {
+              "id": "schema-change",
+              "message": "Schema field added with no type, prisma validate fails",
+              "risk": "high",
+              "file": "prisma/schema.prisma",
+              "line": 16
+            }
+          ],
+          "patch": "diff --git a/prisma/schema.prisma b/prisma/schema.prisma\nindex 2d4e6f8..9a1b3c5 100644\n--- a/prisma/schema.prisma\n+++ b/prisma/schema.prisma\n@@ -13,4 +13,5 @@ model User {\n   id        Int      @id @default(autoincrement())\n   email     String   @unique\n   password  String\n   createdAt DateTime @default(now())\n+  isAdmin\n }\n"
+        }
+      ]
+    },
+    {
+      "domain": "ui",
+      "risk": "low",
+      "score": 5,
+      "inScope": true,
+      "approved": false,
+      "flags": [],
+      "hunks": [
+        {
+          "id": "ui-0001",
+          "file": "src/app/signup/page.tsx",
+          "domain": "ui",
+          "added": 8,
+          "removed": 1,
+          "inScope": true,
+          "score": 5,
+          "flags": [],
+          "patch": "diff --git a/src/app/signup/page.tsx b/src/app/signup/page.tsx\nindex 4c5d6e7..1f2a3b4 100644\n--- a/src/app/signup/page.tsx\n+++ b/src/app/signup/page.tsx\n@@ -6,9 +6,16 @@ export default function SignupPage() {\n   const [email, setEmail] = useState('');\n   const [password, setPassword] = useState('');\n+  const [error, setError] = useState('');\n \n   function handleSubmit(event: React.FormEvent) {\n     event.preventDefault();\n-    submit({ email, password });\n+\n+    if (!email.includes('@')) {\n+      setError('Enter a valid email address');\n+      return;\n+    }\n+\n+    if (password.length < 8) {\n+      setError('Password must be at least 8 characters');\n+      return;\n+    }\n+\n+    setError('');\n     submit({ email, password });\n   }\n"
+        }
+      ]
+    }
+  ]
+}

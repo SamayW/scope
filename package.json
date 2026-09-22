@@ -1,0 +1,75 @@
+{
+  "name": "scope",
+  "displayName": "Scope",
+  "description": "Local pre-push gate for AI-agent changes. Groups the diff by domain, ranks risk, flags out-of-scope edits, runs scoped checks.",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=18"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "bin": {
+    "scope": "./out/cli.js"
+  },
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "scope.refresh",
+        "title": "Scope: Refresh",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "scope",
+          "title": "Scope",
+          "icon": "resources/scope.svg"
+        }
+      ]
+    },
+    "views": {
+      "scope": [
+        {
+          "type": "webview",
+          "id": "scope.sidebar",
+          "name": "Changes"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "scope.refresh",
+          "when": "view == scope.sidebar",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "execa": "^5.1.1",
+    "minimatch": "^10.2.6",
+    "parse-diff": "^0.12.0",
+    "simple-git": "^3.36.0",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}
