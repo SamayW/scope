@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, appendFileSync, symlinkSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  appendFileSync,
+  symlinkSync,
+  existsSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runTests } from '@vscode/test-electron';
@@ -15,11 +23,28 @@ function buildWorkspace(): string {
 
   execFileSync('git', ['clone', '-q', demo, dir], { stdio: 'pipe' });
 
+  // A clone carries the source's local branches but not its remote-tracking
+  // refs, so cloning a freshly cloned demo repo loses the demo branches. Pull
+  // each one across when the plain clone did not bring it.
+  for (const branch of ['demo-base', 'demo-agent']) {
+    try {
+      execFileSync('git', ['rev-parse', '--verify', '-q', `refs/heads/${branch}`], {
+        cwd: dir,
+        stdio: 'pipe',
+      });
+    } catch {
+      execFileSync(
+        'git',
+        ['fetch', '-q', demo, `refs/remotes/origin/${branch}:refs/heads/${branch}`],
+        { cwd: dir, stdio: 'pipe' }
+      );
+    }
+  }
+
   // Without the dependencies the checks would try to fetch packages through
   // npx and time out, which says nothing about the extension.
   symlinkSync(join(demo, 'node_modules'), join(dir, 'node_modules'));
-  git('checkout', '-q', '-b', 'demo-agent', 'origin/demo-agent');
-  git('checkout', '-q', '-B', 'run', 'origin/demo-base');
+  git('checkout', '-q', '-B', 'run', 'demo-base');
 
   const baseline = execFileSync('git', ['rev-parse', 'HEAD'], {
     cwd: dir,
@@ -56,9 +81,13 @@ async function main(): Promise<void> {
   const workspace = buildWorkspace();
 
   try {
+    // Use a locally installed VS Code when there is one, otherwise let the
+    // harness download a build. Hardcoding the macOS path made this suite
+    // unrunnable anywhere else.
+    const localVsCode = '/Applications/Visual Studio Code.app/Contents/MacOS/Code';
+
     await runTests({
-      // use the installed VS Code rather than downloading a second copy
-      vscodeExecutablePath: '/Applications/Visual Studio Code.app/Contents/MacOS/Code',
+      ...(existsSync(localVsCode) ? { vscodeExecutablePath: localVsCode } : {}),
       extensionDevelopmentPath,
       extensionTestsPath,
       launchArgs: [workspace, '--disable-extensions', '--disable-gpu'],
