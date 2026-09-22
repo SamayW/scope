@@ -105,7 +105,8 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "vitest run"
+    "test": "vitest run",
+    "itest": "tsc -p ./ && node out/itest/runTest.js"
   },
   "dependencies": {
     "commander": "^14.0.3",
@@ -116,8 +117,12 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^26.6.2",
     "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^3.1.0",
+    "glob": "^13.0.6",
+    "mocha": "^12.0.2",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   }

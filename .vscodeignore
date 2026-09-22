@@ -6,3 +6,4 @@ node_modules/**
 tsconfig.json
 vitest.config.mts
 **/*.map
+out/itest/**
