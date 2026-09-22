@@ -16,6 +16,7 @@ const EXPECTED_COMMANDS = [
   'scope.revertOutOfScope',
   'scope.installHook',
   'scope.focus',
+  'scope.fileReport',
 ];
 
 function root(): string {
@@ -93,6 +94,13 @@ suite('Scope extension host', () => {
     await vscode.commands.executeCommand('scope.approve', 'src/middleware.ts#0');
     const session = JSON.parse(readFileSync(join(root(), '.scope', 'session.json'), 'utf8'));
     assert.deepStrictEqual(session.approved, ['src/middleware.ts#0']);
+  });
+
+  test('scope.fileReport runs for a file the analysis covers', async () => {
+    await vscode.commands.executeCommand('scope.refresh');
+    const doc = await vscode.workspace.openTextDocument(join(root(), 'src', 'middleware.ts'));
+    await vscode.window.showTextDocument(doc);
+    await vscode.commands.executeCommand('scope.fileReport');
   });
 
   test('the sidebar webview html loads from media', () => {

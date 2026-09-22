@@ -9,6 +9,16 @@ import { simpleGit } from 'simple-git';
  */
 export const SCOPE_STATE_PREFIX = '.scope/';
 
+/** False for a folder git knows nothing about. */
+export async function isGitRepo(cwd: string): Promise<boolean> {
+  try {
+    await simpleGit(cwd).revparse(['--git-dir']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** SHA of the current HEAD. */
 export async function getHeadSha(cwd: string): Promise<string> {
   const sha = await simpleGit(cwd).revparse(['HEAD']);

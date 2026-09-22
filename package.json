@@ -54,6 +54,11 @@
       {
         "command": "scope.focus",
         "title": "Scope: Focus Sidebar"
+      },
+      {
+        "command": "scope.fileReport",
+        "title": "Scope: What ran on this file",
+        "icon": "$(shield)"
       }
     ],
     "viewsContainers": {
@@ -99,6 +104,13 @@
           "command": "scope.focus",
           "when": "false"
         }
+      ],
+      "editor/title": [
+        {
+          "command": "scope.fileReport",
+          "when": "scope.fileTracked",
+          "group": "navigation@1"
+        }
       ]
     }
   },
@@ -109,7 +121,8 @@
     "itest": "tsc -p ./ && node out/itest/runTest.js",
     "demo:reset": "bash scripts/demo-reset.sh",
     "demo:agent": "bash scripts/demo-agent.sh",
-    "package": "vsce package"
+    "package": "vsce package",
+    "demo": "bash scripts/demo.sh"
   },
   "dependencies": {
     "commander": "^14.0.3",

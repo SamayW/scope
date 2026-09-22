@@ -361,6 +361,7 @@
       let checks = [];
       let results = {};
       let gate = null;
+      let notice = null;
 
       const collapsed = new Set();
       const expandedOutput = new Set();
@@ -489,6 +490,12 @@
       }
 
       function render() {
+        if (notice) {
+          document.getElementById('app').innerHTML =
+            `<div class="empty">${esc(notice)}</div>`;
+          return;
+        }
+
         const groups = analysis ? [...analysis.groups] : [];
         groups.sort((a, b) => RISKS[a.risk] - RISKS[b.risk] || b.score - a.score);
 
@@ -539,7 +546,11 @@
 
       window.addEventListener('message', (event) => {
         const message = event.data;
-        if (message.type === 'analysis') {
+        if (message.type === 'notice') {
+          notice = message.data;
+          analysis = null;
+        } else if (message.type === 'analysis') {
+          notice = null;
           analysis = message.data;
           checks = [];
           results = {};

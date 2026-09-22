@@ -1,6 +1,6 @@
 export * from './types.js';
 export { analyze } from './analyze.js';
-export { getHeadSha, getRawDiff } from './git.js';
+export { getHeadSha, getRawDiff, getRepoRoot, isGitRepo } from './git.js';
 export { parseHunks } from './diff.js';
 export { classify } from './classify.js';
 export { scoreHunk, toLevel, SECRET_PATTERNS } from './risk.js';
