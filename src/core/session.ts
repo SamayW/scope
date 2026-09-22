@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getHeadSha } from './git.js';
 import type { Session } from './types.js';
@@ -8,22 +8,19 @@ const SESSION_FILE = 'session.json';
 
 const sessionPath = (cwd: string) => join(cwd, SESSION_DIR, SESSION_FILE);
 
-/** Adds .scope/ to .gitignore so session state never gets committed. */
+/**
+ * Makes .scope/ invisible to git by dropping a `*` gitignore inside it, so the
+ * directory ignores its own contents including that file.
+ *
+ * The obvious alternative, appending `.scope/` to the repo's own .gitignore,
+ * edits a tracked file. That edit then shows up in Scope's very next analysis
+ * as an unexplained out-of-scope change in the `other` domain, which is both
+ * confusing and Scope reporting on its own setup.
+ */
 function ensureGitignored(cwd: string): void {
-  const gitignore = join(cwd, '.gitignore');
-  const current = existsSync(gitignore) ? readFileSync(gitignore, 'utf8') : '';
-
-  const alreadyListed = current
-    .split('\n')
-    .map((line) => line.trim())
-    .some((line) => line === '.scope/' || line === '.scope');
-
-  if (alreadyListed) {
-    return;
-  }
-
-  const separator = current === '' || current.endsWith('\n') ? '' : '\n';
-  appendFileSync(gitignore, `${separator}.scope/\n`);
+  const dir = join(cwd, SESSION_DIR);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, '.gitignore'), '*\n');
 }
 
 /** Pins the baseline to the current HEAD and writes .scope/session.json. */
