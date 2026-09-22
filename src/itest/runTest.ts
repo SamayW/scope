@@ -90,7 +90,16 @@ async function main(): Promise<void> {
       ...(existsSync(localVsCode) ? { vscodeExecutablePath: localVsCode } : {}),
       extensionDevelopmentPath,
       extensionTestsPath,
-      launchArgs: [workspace, '--disable-extensions', '--disable-gpu'],
+      launchArgs: [
+        workspace,
+        // its own profile, otherwise VS Code refuses to start a second
+        // instance while one is already open and fails in claimInstance
+        '--user-data-dir',
+        join(workspace, '.vscode-user-data'),
+        '--disable-extensions',
+        '--disable-workspace-trust',
+        '--disable-gpu',
+      ],
     });
   } finally {
     rmSync(workspace, { recursive: true, force: true });
