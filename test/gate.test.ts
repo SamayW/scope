@@ -92,9 +92,9 @@ describe('loadPolicy', () => {
     expect(loadPolicy(repo).blockOn).toEqual(['secrets']);
   });
 
-  it('reads per-domain command overrides', () => {
+  it('reads per-domain command overrides from the groups key', () => {
     writeFileSync(join(repo, '.scope.yml'), 'groups:\n  db: ["npm run db:check"]\n');
-    expect(loadPolicy(repo).groups).toEqual({ db: ['npm run db:check'] });
+    expect(loadPolicy(repo).customChecks).toEqual({ db: ['npm run db:check'] });
   });
 
   it('drops unknown rule names rather than trusting them', () => {

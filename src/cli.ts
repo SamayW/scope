@@ -132,10 +132,10 @@ program
         typescript: true,
         next: true,
         prisma: true,
-        vitest: true,
-        jest: false,
-        eslint: true,
+        eslint: false,
         docker: false,
+        testRunner: 'vitest',
+        packageManager: 'npm',
       };
     }
 
