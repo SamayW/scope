@@ -122,7 +122,8 @@
     "demo:reset": "bash scripts/demo-reset.sh",
     "demo:agent": "bash scripts/demo-agent.sh",
     "package": "vsce package",
-    "demo": "bash scripts/demo.sh"
+    "demo": "bash scripts/demo.sh",
+    "itest:installed": "tsc -p ./ && SCOPE_ITEST_TARGET=\"$HOME/.vscode/extensions/samay.scope-0.0.1\" node out/itest/runTest.js"
   },
   "dependencies": {
     "commander": "^14.0.3",

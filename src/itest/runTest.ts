@@ -47,7 +47,11 @@ function buildWorkspace(): string {
 }
 
 async function main(): Promise<void> {
-  const extensionDevelopmentPath = resolve(__dirname, '../../');
+  // SCOPE_ITEST_TARGET lets the same suite run against the packaged and
+  // installed copy, which is what people actually get, rather than the source
+  // tree with node_modules sitting beside it.
+  const extensionDevelopmentPath = process.env.SCOPE_ITEST_TARGET ?? resolve(__dirname, '../../');
+  console.log(`testing extension at: ${extensionDevelopmentPath}`);
   const extensionTestsPath = resolve(__dirname, './suite/index');
   const workspace = buildWorkspace();
 
