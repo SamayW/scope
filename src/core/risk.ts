@@ -1,11 +1,24 @@
-import type { Flag, Group, Hunk, Risk } from './types.js';
+import type { Domain, Hunk, RiskFlag, RiskLevel } from './types.js';
 
-/** Scores a single hunk and returns the flags that produced the score. */
-export function scoreHunk(hunk: Hunk): { score: number; flags: Flag[] } {
-  throw new Error('not implemented');
+/** Exported so the secret-scan check can reuse the same patterns. */
+export const SECRET_PATTERNS: RegExp[] = [
+  /sk-[A-Za-z0-9-]{10,}/,
+  /AKIA[0-9A-Z]{16}/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /(password|secret|api_?key)\s*[:=]\s*["'][^"']{6,}["']/i,
+];
+
+export function toLevel(score: number): RiskLevel {
+  if (score >= 10) {
+    return 'high';
+  }
+  if (score >= 4) {
+    return 'medium';
+  }
+  return 'low';
 }
 
-/** Sums hunk scores across a group and buckets the total into a risk level. */
-export function scoreGroup(group: Group): { score: number; risk: Risk } {
+/** Returns every risk flag the hunk trips. Pure. */
+export function scoreHunk(hunk: Hunk, domain: Domain): RiskFlag[] {
   throw new Error('not implemented');
 }

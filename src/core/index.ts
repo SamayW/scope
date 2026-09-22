@@ -1,10 +1,12 @@
 export * from './types.js';
 export { analyze } from './analyze.js';
-export { getDiff, parseHunks } from './diff.js';
-export { classifyHunk, groupHunks } from './classify.js';
-export { scoreHunk, scoreGroup } from './risk.js';
-export { matchScope, applyScope } from './scope.js';
+export { getHeadSha, getRawDiff } from './git.js';
+export { parseHunks } from './diff.js';
+export { classify } from './classify.js';
+export { scoreHunk, toLevel, SECRET_PATTERNS } from './risk.js';
+export { isInScope } from './scope.js';
+export { buildGroups } from './group.js';
+export { startSession, loadSession, saveSession, approveHunk } from './session.js';
 export { detectStack } from './stack.js';
 export { selectChecks, runChecks } from './checks.js';
-export { evaluateGate } from './gate.js';
-export { startSession, loadSession, saveSession } from './session.js';
+export { loadPolicy, evaluateGate, DEFAULT_POLICY } from './gate.js';

@@ -1,10 +1,10 @@
-import type { Check, CheckResult, Group, Stack } from './types.js';
+import type { Analysis, Check, CheckResult, Policy, Stack } from './types.js';
 
 /**
- * STUB (M0): returns three fixed checks regardless of input.
+ * Dev B. STUB: returns three fixed checks regardless of input.
  * Real version maps changed domains plus the detected stack onto commands.
  */
-export function selectChecks(groups: Group[], stack: Stack): Check[] {
+export function selectChecks(stack: Stack, analysis: Analysis, policy: Policy): Check[] {
   return [
     {
       id: 'tsc',
@@ -33,14 +33,12 @@ export function selectChecks(groups: Group[], stack: Stack): Check[] {
   ];
 }
 
-/**
- * STUB (M0): returns fixed results without running anything.
- * Real version runs the commands in parallel with per-command timeouts.
- */
-export async function runChecks(checks: Check[], repoRoot: string): Promise<CheckResult[]> {
+/** Dev B. STUB: returns fixed results without running anything. */
+export async function runChecks(checks: Check[], cwd: string): Promise<CheckResult[]> {
   return [
     {
       checkId: 'tsc',
+      label: 'tsc --noEmit',
       status: 'pass',
       exitCode: 0,
       durationMs: 1840,
@@ -48,14 +46,15 @@ export async function runChecks(checks: Check[], repoRoot: string): Promise<Chec
     },
     {
       checkId: 'prisma-validate',
+      label: 'prisma validate',
       status: 'fail',
       exitCode: 1,
       durationMs: 620,
-      output:
-        'Error validating model "User": Field "isAdmin" is missing a type.\n  -->  prisma/schema.prisma:16',
+      output: 'Error validating model "User": This field declaration is invalid.',
     },
     {
       checkId: 'vitest-related',
+      label: 'vitest related',
       status: 'pass',
       exitCode: 0,
       durationMs: 2310,

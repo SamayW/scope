@@ -2,7 +2,7 @@
 import { Command } from 'commander';
 import { analyze } from './core/analyze.js';
 import { selectChecks, runChecks } from './core/checks.js';
-import { evaluateGate } from './core/gate.js';
+import { loadPolicy, evaluateGate } from './core/gate.js';
 import { detectStack } from './core/stack.js';
 import type { Stack } from './core/types.js';
 
@@ -15,32 +15,37 @@ program
   .description('Record the baseline commit and declare the allowed scope')
   .argument('<task>', 'what the agent was asked to do')
   .option('-a, --allow <glob...>', 'allowed path globs')
-  .action((task: string, options: { allow?: string[] }) => {
+  .option('-d, --domain <domain...>', 'allowed domains')
+  .action((task: string, options: { allow?: string[]; domain?: string[] }) => {
     console.log(`scope start: ${task}`);
     console.log(`allowed: ${(options.allow ?? []).join(', ') || '(none yet)'}`);
-    console.log('Not implemented in M0. startSession lands in M1.');
+    console.log('Not implemented yet.');
   });
 
 program
   .command('check')
   .description('Analyze the diff, run scoped checks, and apply the gate')
   .action(async () => {
-    const analysis = await analyze(process.cwd());
+    const cwd = process.cwd();
+    const analysis = await analyze(cwd);
+    const policy = loadPolicy(cwd);
 
-    console.log(`task: ${analysis.session.task}`);
-    console.log(`scope: ${analysis.session.allowGlobs.join(', ')}`);
-    console.log('');
+    if (analysis.session) {
+      console.log(`task: ${analysis.session.task}`);
+      console.log(`scope: ${analysis.session.allow.globs.join(', ')}`);
+      console.log('');
+    }
+
     console.log(`${analysis.groups.length} groups`);
-
     for (const group of analysis.groups) {
-      const scope = group.inScope ? 'in scope' : 'OUT OF SCOPE';
+      const scope = group.outOfScope ? 'OUT OF SCOPE' : 'in scope';
       console.log(`  ${group.domain.padEnd(7)} ${group.risk.padEnd(6)} ${scope}`);
     }
 
-    // detectStack still throws in M0, so the stub check list is used directly.
+    // detectStack still throws, so fall back until Dev B lands it.
     let stack: Stack;
     try {
-      stack = detectStack(process.cwd());
+      stack = detectStack(cwd);
     } catch {
       stack = {
         typescript: true,
@@ -53,15 +58,15 @@ program
       };
     }
 
-    const checks = selectChecks(analysis.groups, stack);
-    const results = await runChecks(checks, process.cwd());
+    const checks = selectChecks(stack, analysis, policy);
+    const results = await runChecks(checks, cwd);
 
     console.log('');
     for (const result of results) {
-      console.log(`  ${result.status.toUpperCase().padEnd(5)} ${result.checkId}`);
+      console.log(`  ${result.status.toUpperCase().padEnd(5)} ${result.label}`);
     }
 
-    const gate = evaluateGate(analysis.groups, results, analysis.session);
+    const gate = evaluateGate(analysis, results, policy);
 
     console.log('');
     console.log(gate.blocked ? 'BLOCKED' : 'OK');
@@ -76,11 +81,11 @@ program
 
 program
   .command('approve')
-  .description('Approve an out-of-scope group or hunk')
-  .argument('<id>', 'group domain or hunk id')
-  .action((id: string) => {
-    console.log(`scope approve: ${id}`);
-    console.log('Not implemented in M0. Approvals land in M1.');
+  .description('Approve an out-of-scope hunk')
+  .argument('<hunkId>', 'hunk id')
+  .action((hunkId: string) => {
+    console.log(`scope approve: ${hunkId}`);
+    console.log('Not implemented yet.');
   });
 
 program.parse();
