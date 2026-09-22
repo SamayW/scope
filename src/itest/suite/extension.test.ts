@@ -1,5 +1,5 @@
 import * as assert from 'node:assert';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
 
@@ -101,6 +101,30 @@ suite('Scope extension host', () => {
     const doc = await vscode.workspace.openTextDocument(join(root(), 'src', 'middleware.ts'));
     await vscode.window.showTextDocument(doc);
     await vscode.commands.executeCommand('scope.fileReport');
+  });
+
+  test('scope.revertHunk actually changes the file on disk', async () => {
+    await vscode.commands.executeCommand('scope.refresh');
+
+    const middleware = join(root(), 'src', 'middleware.ts');
+    assert.ok(readFileSync(middleware, 'utf8').includes('sk-test-'), 'planted key missing');
+
+    await vscode.commands.executeCommand('scope.revertHunk', 'src/middleware.ts#0');
+
+    assert.ok(
+      !readFileSync(middleware, 'utf8').includes('sk-test-'),
+      'revertHunk did nothing to the file'
+    );
+  });
+
+  test('scope.openDiff still works with no session, using the fork point', async () => {
+    // it used to return silently when session.baseline was missing
+    rmSync(join(root(), '.scope'), { recursive: true, force: true });
+    await vscode.commands.executeCommand('scope.refresh');
+    await vscode.commands.executeCommand('scope.openDiff', 'src/app/signup/page.tsx#0');
+
+    const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    assert.ok(tab?.input instanceof vscode.TabInputTextDiff, 'no diff tab without a session');
   });
 
   test('the sidebar webview html loads from media', () => {

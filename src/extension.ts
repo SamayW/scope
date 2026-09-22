@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { analyze } from './core/analyze.js';
 import { selectChecks } from './core/checks.js';
 import { evaluateGate, loadPolicy } from './core/gate.js';
-import { isGitRepo } from './core/git.js';
+import { getFallbackBaseline, isGitRepo } from './core/git.js';
 import { attachResults, runChecks } from './core/runner.js';
 import { revertHunk, revertOutOfScope } from './core/revert.js';
 import { approveHunk, startSession } from './core/session.js';
@@ -249,6 +249,47 @@ function showFileReport(): void {
   }
 }
 
+/** Every command says what it did, so nothing can fail invisibly again. */
+function log(line: string): void {
+  output.appendLine(`[${new Date().toLocaleTimeString()}] ${line}`);
+}
+
+/**
+ * Guards a button action. Returns the repo root and hunk, or explains on screen
+ * why it cannot act. Silent returns here were the reason Diff, Approve and
+ * Revert appeared to do nothing at all.
+ */
+function requireHunk(command: string, hunkId: string | undefined) {
+  const cwd = root();
+
+  if (!cwd) {
+    log(`${command}: no repository resolved`);
+    vscode.window.showWarningMessage('Scope: no git repository. Run Scope: Refresh first.');
+    return undefined;
+  }
+  if (!latest) {
+    log(`${command}: no analysis yet`);
+    vscode.window.showWarningMessage('Scope: nothing analyzed yet. Run Scope: Refresh first.');
+    return undefined;
+  }
+  if (!hunkId) {
+    log(`${command}: called with no hunk id`);
+    vscode.window.showWarningMessage('Scope: that action did not carry a hunk id.');
+    return undefined;
+  }
+
+  const hunk = findHunk(hunkId);
+  if (!hunk) {
+    log(`${command}: hunk ${hunkId} is not in the current analysis`);
+    vscode.window.showWarningMessage(
+      `Scope: ${hunkId} is no longer in the analysis. Refresh and try again.`
+    );
+    return undefined;
+  }
+
+  return { cwd, hunk };
+}
+
 let running = false;
 let queued = false;
 
@@ -351,18 +392,32 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   let timer: NodeJS.Timeout | undefined;
-  const onSave = vscode.workspace.onDidSaveTextDocument(() => {
+  const schedule = () => {
     if (timer) {
       clearTimeout(timer);
     }
     timer = setTimeout(() => void refresh(), 1000);
-  });
+  };
+
+  const onSave = vscode.workspace.onDidSaveTextDocument(schedule);
+
+  // Commits, branch switches and cherry-picks all move HEAD or the index.
+  // Without this the sidebar keeps showing a stale analysis after the working
+  // tree has changed underneath it, and its buttons refer to hunks that are no
+  // longer there.
+  const gitWatcher = vscode.workspace.createFileSystemWatcher(
+    '**/.git/{HEAD,index,ORIG_HEAD}'
+  );
+  gitWatcher.onDidChange(schedule);
+  gitWatcher.onDidCreate(schedule);
+  gitWatcher.onDidDelete(schedule);
 
   context.subscriptions.push(
     status,
     fileStatus,
     output,
     baseProvider,
+    gitWatcher,
     vscode.window.onDidChangeActiveTextEditor(() => updateFileStatus()),
     vscode.commands.registerCommand('scope.fileReport', () => showFileReport()),
     onSave,
@@ -410,39 +465,62 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand('scope.openDiff', async (hunkId: string) => {
-      const cwd = root();
-      const hunk = findHunk(hunkId);
-      const baseline = latest?.session?.baseline;
-      if (!cwd || !hunk || !baseline) {
+      const target = requireHunk('openDiff', hunkId);
+      if (!target) {
         return;
       }
 
-      const left = vscode.Uri.parse(`${BASE_SCHEME}:/${hunk.file}?${baseline}`);
-      const right = vscode.Uri.file(join(cwd, hunk.file));
-      await vscode.commands.executeCommand('vscode.diff', left, right, `${hunk.file} (Scope)`);
+      // Without a session there is no pinned baseline, but the diff is still
+      // meaningful against the fork point. This used to return silently.
+      const baseline = latest?.session?.baseline ?? (await getFallbackBaseline(target.cwd));
+
+      const left = vscode.Uri.parse(`${BASE_SCHEME}:/${target.hunk.file}?${baseline}`);
+      const right = vscode.Uri.file(join(target.cwd, target.hunk.file));
+
+      log(`openDiff ${target.hunk.file} against ${baseline.slice(0, 8)}`);
+      await vscode.commands.executeCommand(
+        'vscode.diff',
+        left,
+        right,
+        `${target.hunk.file} (Scope)`
+      );
     }),
 
     vscode.commands.registerCommand('scope.approve', async (hunkId: string) => {
-      const cwd = root();
-      if (!cwd || !hunkId) {
-        return;
-      }
-      approveHunk(cwd, hunkId);
-      await refresh();
-    }),
-
-    vscode.commands.registerCommand('scope.revertHunk', async (hunkId: string) => {
-      const cwd = root();
-      const hunk = findHunk(hunkId);
-      if (!cwd || !hunk) {
+      const target = requireHunk('approve', hunkId);
+      if (!target) {
         return;
       }
 
       try {
-        await revertHunk(cwd, hunk);
+        approveHunk(target.cwd, hunkId);
+        log(`approved ${hunkId}`);
+        vscode.window.setStatusBarMessage(`Scope: approved ${hunkId}`, 3000);
       } catch (error) {
+        log(`approve failed: ${(error as Error).message}`);
         vscode.window.showErrorMessage(`Scope: ${(error as Error).message}`);
+        return;
       }
+
+      await refresh();
+    }),
+
+    vscode.commands.registerCommand('scope.revertHunk', async (hunkId: string) => {
+      const target = requireHunk('revertHunk', hunkId);
+      if (!target) {
+        return;
+      }
+
+      try {
+        await revertHunk(target.cwd, target.hunk);
+        log(`reverted ${hunkId}`);
+        vscode.window.setStatusBarMessage(`Scope: reverted ${hunkId}`, 3000);
+      } catch (error) {
+        log(`revert failed: ${(error as Error).message}`);
+        vscode.window.showErrorMessage(`Scope: could not revert. ${(error as Error).message}`);
+        return;
+      }
+
       await refresh();
     }),
 
