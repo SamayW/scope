@@ -1,15 +1,37 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import type { Analysis } from './types.js';
+import { classify } from './classify.js';
+import { parseHunks } from './diff.js';
+import { getFallbackBaseline, getRawDiff, SCOPE_STATE_PREFIX } from './git.js';
+import { buildGroups } from './group.js';
+import { scoreHunk } from './risk.js';
+import { isInScope } from './scope.js';
+import { loadSession } from './session.js';
+import type { Analysis, ClassifiedHunk } from './types.js';
 
-/**
- * STUB (M0): ignores repoRoot and returns fixtures/analysis.json.
- * Real version runs getDiff, parseHunks, groupHunks, scoreGroup and applyScope.
- *
- * The fixture is read at runtime rather than imported so it can live outside
- * rootDir ("src") without breaking tsc.
- */
-export async function analyze(repoRoot: string = process.cwd()): Promise<Analysis> {
-  const fixturePath = join(__dirname, '..', '..', 'fixtures', 'analysis.json');
-  return JSON.parse(readFileSync(fixturePath, 'utf8')) as Analysis;
+/** The whole pipeline: git diff in, grouped and scored Analysis out. */
+export async function analyze(cwd: string = process.cwd()): Promise<Analysis> {
+  const session = loadSession(cwd);
+  const baseline = session?.baseline ?? (await getFallbackBaseline(cwd));
+  const hunks = parseHunks(await getRawDiff(cwd, baseline)).filter(
+    (hunk) => !hunk.file.startsWith(SCOPE_STATE_PREFIX)
+  );
+
+  const classified: ClassifiedHunk[] = hunks.map((hunk) => {
+    const domain = classify(hunk);
+    const flags = scoreHunk(hunk, domain);
+
+    return {
+      ...hunk,
+      domain,
+      flags,
+      score: flags.reduce((sum, flag) => sum + flag.points, 0),
+      inScope: isInScope(hunk, domain, session),
+      approved: session?.approved.includes(hunk.id) ?? false,
+    };
+  });
+
+  return {
+    session,
+    groups: buildGroups(classified),
+    changedFiles: [...new Set(hunks.map((hunk) => hunk.file))],
+  };
 }

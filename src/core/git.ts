@@ -1,6 +1,14 @@
 import execa from 'execa';
 import { simpleGit } from 'simple-git';
 
+/**
+ * Scope's own session state. Never analyze it: startSession gitignores the
+ * folder, but a repo that has not run `scope start` yet would otherwise see
+ * session.json as an untracked file and, because the path contains "session",
+ * classify it as an auth change.
+ */
+export const SCOPE_STATE_PREFIX = '.scope/';
+
 /** SHA of the current HEAD. */
 export async function getHeadSha(cwd: string): Promise<string> {
   const sha = await simpleGit(cwd).revparse(['HEAD']);
@@ -30,7 +38,8 @@ export async function getRawDiff(cwd: string, baseline: string): Promise<string>
   const untracked = listed
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((file) => !file.startsWith(SCOPE_STATE_PREFIX));
 
   for (const file of untracked) {
     // `git diff --no-index` exits 1 when the files differ, which is the normal
