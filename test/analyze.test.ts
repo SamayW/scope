@@ -5,8 +5,7 @@ import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { analyze } from '../src/core/analyze.js';
 import type { Analysis, Session } from '../src/core/types.js';
-
-const DEMO = resolve(__dirname, '../../scope-demo');
+import { DEMO_REPO as DEMO, hasDemoRepo } from './demo-repo.js';
 
 let clone: string;
 let baseSha: string;
@@ -35,7 +34,7 @@ afterAll(() => {
   rmSync(clone, { recursive: true, force: true });
 });
 
-describe('analyze on the demo repo, scoped to the signup UI', () => {
+describe.skipIf(!hasDemoRepo)('analyze on the demo repo, scoped to the signup UI', () => {
   let analysis: Analysis;
 
   beforeAll(async () => {
@@ -101,7 +100,7 @@ describe('analyze on the demo repo, scoped to the signup UI', () => {
   });
 });
 
-describe('scope boundaries change what counts as out of scope', () => {
+describe.skipIf(!hasDemoRepo)('scope boundaries change what counts as out of scope', () => {
   it('a broader glob pulls the deleted test back in scope', async () => {
     // Worth knowing for the demo: "src/app/signup/**" also covers
     // signup.test.ts, so the deleted test stops being an out-of-scope finding
@@ -124,7 +123,7 @@ describe('scope boundaries change what counts as out of scope', () => {
   });
 });
 
-describe('a folder git knows nothing about', () => {
+describe.skipIf(!hasDemoRepo)('a folder git knows nothing about', () => {
   it('fails with a readable message rather than git usage text', async () => {
     const plain = mkdtempSync(join(tmpdir(), 'scope-nogit-'));
     writeFileSync(join(plain, 'a.ts'), 'export const a = 1;\n');

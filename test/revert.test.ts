@@ -6,8 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { analyze } from '../src/core/analyze.js';
 import { revertHunk, revertFile, revertOutOfScope } from '../src/core/revert.js';
 import type { Session } from '../src/core/types.js';
-
-const DEMO = resolve(__dirname, '../../scope-demo');
+import { DEMO_REPO as DEMO, hasDemoRepo } from './demo-repo.js';
 
 let clone: string;
 let baseSha: string;
@@ -41,7 +40,7 @@ afterEach(() => {
   rmSync(clone, { recursive: true, force: true });
 });
 
-describe('revertHunk', () => {
+describe.skipIf(!hasDemoRepo)('revertHunk', () => {
   it('undoes a single hunk', async () => {
     const analysis = await analyze(clone);
     const middleware = analysis.groups
@@ -81,7 +80,7 @@ describe('revertHunk', () => {
   });
 });
 
-describe('revertFile', () => {
+describe.skipIf(!hasDemoRepo)('revertFile', () => {
   it('checks a modified file back out of the baseline', async () => {
     await revertFile(clone, 'prisma/schema.prisma', baseSha, 'modified');
     expect(readFileSync(join(clone, 'prisma/schema.prisma'), 'utf8')).not.toContain('isAdmin');
@@ -98,7 +97,7 @@ describe('revertFile', () => {
   });
 });
 
-describe('revertOutOfScope', () => {
+describe.skipIf(!hasDemoRepo)('revertOutOfScope', () => {
   it('leaves only the signup validation behind', async () => {
     const analysis = await analyze(clone);
     const { reverted, failed } = await revertOutOfScope(clone, analysis);
@@ -173,7 +172,7 @@ describe('revertOutOfScope', () => {
   });
 });
 
-describe('bottom-up ordering within a file', () => {
+describe.skipIf(!hasDemoRepo)('bottom-up ordering within a file', () => {
   let repo: string;
   let base: string;
 

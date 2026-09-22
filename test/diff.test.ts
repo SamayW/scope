@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { parseHunks } from '../src/core/diff.js';
+import { DEMO_REPO, hasDemoRepo } from './demo-repo.js';
 
 const sample = readFileSync(resolve(__dirname, '../fixtures/sample.diff'), 'utf8');
 const hunks = parseHunks(sample);
@@ -76,13 +77,13 @@ describe('parseHunks', () => {
   });
 });
 
-describe('patch is applyable, which is what the revert feature depends on', () => {
+describe.skipIf(!hasDemoRepo)('patch is applyable, which is what the revert feature depends on', () => {
   let clone: string;
 
   beforeAll(() => {
     // Clone the demo repo so the real one is never touched.
     clone = mkdtempSync(join(tmpdir(), 'scope-demo-clone-'));
-    execFileSync('git', ['clone', '-q', resolve(__dirname, '../../scope-demo'), clone]);
+    execFileSync('git', ['clone', '-q', DEMO_REPO, clone]);
     execFileSync('git', ['checkout', '-q', 'agent'], { cwd: clone });
   });
 

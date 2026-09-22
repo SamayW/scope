@@ -52,13 +52,19 @@ A status bar item on the right tracks whichever file you are looking at, and the
 
 ```sh
 npm run compile        # tsc
-npm test               # 206 unit tests
+npm test               # unit tests
 npm run itest          # 13 tests inside a real VS Code extension host
 npm run package        # build the vsix
 npm run demo           # stage the demo repo end to end
 ```
 
 `scope start | check | approve | install-hook` from the CLI.
+
+Some suites exercise the engine against the demo repository. Clone it as a sibling to run them; without it they skip rather than fail:
+
+```sh
+git clone https://github.com/SamayW/scope-demo.git ../scope-demo
+```
 
 ## Layout
 

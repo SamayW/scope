@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { detectStack } from '../src/core/stack.js';
+import { DEMO_REPO, hasDemoRepo } from './demo-repo.js';
 
 let dir: string;
 
@@ -92,9 +93,9 @@ describe('detectStack', () => {
   );
 });
 
-describe('detectStack on the real demo repo', () => {
+describe.skipIf(!hasDemoRepo)('detectStack on the real demo repo', () => {
   it('identifies it as Next plus Prisma plus vitest on npm', () => {
-    const stack = detectStack(resolve(__dirname, '../../scope-demo'));
+    const stack = detectStack(DEMO_REPO);
     expect(stack).toEqual({
       typescript: true,
       next: true,
