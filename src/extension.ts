@@ -1,4 +1,5 @@
-import { join, relative, sep } from 'node:path';
+import { existsSync, readdirSync } from 'node:fs';
+import { basename, join, relative, sep } from 'node:path';
 import execa from 'execa';
 import * as vscode from 'vscode';
 import { analyze } from './core/analyze.js';
@@ -32,8 +33,63 @@ let latest: Analysis | null = null;
 let latestChecks: Check[] = [];
 let latestResults: CheckResult[] = [];
 
+let repoRoot: string | undefined;
+
 function root(): string | undefined {
-  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return repoRoot;
+}
+
+/** Git repositories sitting one level below a folder. */
+function childRepos(dir: string): string[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+      .filter((entry) => entry.name !== 'node_modules')
+      .map((entry) => join(dir, entry.name))
+      .filter((child) => existsSync(join(child, '.git')));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The workspace folder is often a container rather than the repository itself,
+ * for example a folder holding two checkouts side by side. Fall back to looking
+ * one level down before giving up.
+ */
+async function resolveRepoRoot(): Promise<string | undefined> {
+  if (repoRoot && (await isGitRepo(repoRoot))) {
+    return repoRoot;
+  }
+
+  const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!workspace) {
+    return undefined;
+  }
+
+  if (await isGitRepo(workspace)) {
+    repoRoot = workspace;
+    return repoRoot;
+  }
+
+  const children = childRepos(workspace);
+
+  if (children.length === 1) {
+    repoRoot = children[0];
+    return repoRoot;
+  }
+
+  if (children.length > 1) {
+    const pick = await vscode.window.showQuickPick(
+      children.map((path) => ({ label: basename(path), description: path, path })),
+      { title: 'Scope: which repository should I watch?' }
+    );
+    repoRoot = pick?.path;
+    return repoRoot;
+  }
+
+  repoRoot = undefined;
+  return undefined;
 }
 
 function findHunk(hunkId: string): ClassifiedHunk | undefined {
@@ -218,20 +274,21 @@ async function refresh(): Promise<void> {
 }
 
 async function runRefresh(): Promise<void> {
-  const cwd = root();
-  if (!cwd) {
-    return;
-  }
+  const cwd = await resolveRepoRoot();
 
-  if (!(await isGitRepo(cwd))) {
+  if (!cwd) {
     latest = null;
     status.hide();
     fileStatus.hide();
     panel.post({
       type: 'notice',
-      data: 'This folder is not a git repository. Scope compares your changes against a baseline commit, so it needs git. Run git init here, or open a project that is already tracked.',
+      data: 'No git repository here. Scope compares your changes against a baseline commit, so it needs one. Open the repository itself, or a folder that contains one, or run git init.',
     });
     return;
+  }
+
+  if (cwd !== vscode.workspace.workspaceFolders?.[0]?.uri.fsPath) {
+    panel.post({ type: 'repo', data: basename(cwd) });
   }
 
   const analysis = await analyze(cwd);

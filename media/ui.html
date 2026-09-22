@@ -362,6 +362,7 @@
       let results = {};
       let gate = null;
       let notice = null;
+      let repoName = null;
 
       const collapsed = new Set();
       const expandedOutput = new Set();
@@ -397,8 +398,10 @@
             <button class="primary" data-act="start">Start task</button>`;
         }
         const globs = analysis.session.allow.globs;
+        const repo = repoName ? `<div class="globs">repo: ${esc(repoName)}</div>` : '';
         return `
           <div class="task">${esc(analysis.session.task)}</div>
+          ${repo}
           <div class="globs">${globs.length ? esc(globs.join('  ')) : 'no paths allowed'}</div>`;
       }
 
@@ -546,7 +549,9 @@
 
       window.addEventListener('message', (event) => {
         const message = event.data;
-        if (message.type === 'notice') {
+        if (message.type === 'repo') {
+          repoName = message.data;
+        } else if (message.type === 'notice') {
           notice = message.data;
           analysis = null;
         } else if (message.type === 'analysis') {
